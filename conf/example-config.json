@@ -1,0 +1,44 @@
+{
+  "updates_type": "polling",
+  "webhook": {
+    "endpoint": "https://example.com:8443/",
+    "cert_file": "./server.pem",
+    "cert_key_file": "./server.key",
+    "listen_addr": "0.0.0.0:8081",
+    "token": ""
+  },
+  "modules": {
+    "enable_member_verify": true,
+    "enable_mars": true,
+    "enable_command": true,
+    "enable_private_command": true
+  },
+  "whitelist": {
+    "groups_id": [
+    ],
+    "groups_username": [
+    ]
+  },
+  "disable_whitelist": false,
+  "redis_host": "172.17.0.2:6379",
+  "bot_token": "",
+  "key_ttl": 31557600,
+  "log_level": 2,
+  "commands": [
+    "studytop",
+    "marstop",
+    "study",
+    "ban",
+    "dban",
+    "unban",
+    "rt",
+    "unrt",
+    "enable",
+    "disable",
+    "warn",
+    "unwarn"
+  ],
+  "private_commands": [
+    "start"
+  ]
+}

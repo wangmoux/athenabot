@@ -1,43 +1,46 @@
 package app
 
 import (
+	"athenabot/client"
 	"athenabot/config"
-	"bytes"
-	"github.com/sirupsen/logrus"
-	"io"
+	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"io/ioutil"
-	"mime/multipart"
-	"net/http"
-	"os"
-	"path/filepath"
 )
 
-func setWebhook() {
-	url := "https://api.telegram.org/bot" + config.Conf.BotToken + "/setWebhook"
-	method := "POST"
-	payload := &bytes.Buffer{}
-	writer := multipart.NewWriter(payload)
-	certFile, err := os.Open(config.Conf.Webhook.CertFile)
-	if err != nil {
-		logrus.Error(err)
+func (c Webhook) setCustomWebhook() (string, error) {
+	req := client.NewRequestFD("https://api.telegram.org/bot"+config.Conf.BotToken+"/setWebhook", "POST")
+	formData := make(map[string]string)
+	formData["url"] = config.Conf.Webhook.Endpoint + config.Conf.Webhook.Token
+	req.FormData = formData
+	req.File = &client.File{
+		File:     config.Conf.Webhook.CertFile,
+		FileName: "certificate",
 	}
-	defer certFile.Close()
-
-	certificate, _ := writer.CreateFormFile("certificate", filepath.Base(config.Conf.Webhook.CertFile))
-	_, _ = io.Copy(certificate, certFile)
-	_ = writer.WriteField("url", config.Conf.Webhook.Endpoint+config.Conf.Webhook.Token)
-	_ = writer.Close()
-
-	client := &http.Client{}
-	req, _ := http.NewRequest(method, url, payload)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	resp, err := client.Do(req)
+	res, err := req.Do()
 	if err != nil {
-		logrus.Error(err)
+		return "", err
 	}
+	return string(res), nil
+}
 
-	defer resp.Body.Close()
-	res, _ := ioutil.ReadAll(resp.Body)
-
-	logrus.Infof("set_webhook_res:%v", string(res))
+func (c Webhook) setWebhook() (string, error) {
+	certFile, err := ioutil.ReadFile(config.Conf.Webhook.CertFile)
+	if err != nil {
+		return "", err
+	}
+	cert := tgbotapi.FileBytes{
+		Name:  "certificate",
+		Bytes: certFile,
+	}
+	wh, _ := tgbotapi.NewWebhookWithCert(config.Conf.Webhook.Endpoint+config.Conf.Webhook.Token, cert)
+	_, err = c.bot.Request(wh)
+	if err != nil {
+		return "", err
+	}
+	info, err := c.bot.GetWebhookInfo()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%+v", info), err
 }

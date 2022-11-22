@@ -48,7 +48,7 @@ func (c *ChatMemberConfig) NewChatMember() {
 			c.messageConfig.Text = "欢迎 新群友 【点我】 完成验证就可以说话了"
 			c.sendMessage()
 			chatVerifyKey := chatVerifyKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + util.NumToStr(c.update.Message.From.ID)
-			err := db.RDB.Set(c.ctx, chatVerifyKey, c.update.Message.Chat.UserName, time.Duration(3600*1000000000)).Err()
+			err := db.RDB.Set(c.ctx, chatVerifyKey, c.update.Message.Chat.UserName, time.Second*3600).Err()
 			if err != nil {
 				logrus.Error(err)
 			}

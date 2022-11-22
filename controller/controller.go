@@ -21,7 +21,7 @@ func isInWhitelist(ChatUserName string, chatID int64) bool {
 	return false
 }
 
-func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	logrus.DebugFn(util.LogMarshalFn(update))
 	c := service.NewBotConfig(ctx, cancel, bot, update)
 	if config.Conf.DisableWhitelist || isInWhitelist(update.Message.Chat.UserName, update.Message.Chat.ID) {

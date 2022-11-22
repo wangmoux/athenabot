@@ -40,7 +40,12 @@ func (c Polling) GetBot() *tgbotapi.BotAPI {
 }
 
 func (c Webhook) Channel() tgbotapi.UpdatesChannel {
-	setWebhook()
+	res, err := c.setWebhook()
+	if err != nil {
+		logrus.Error(err)
+	}
+	logrus.Infof("webhook:%v", res)
+
 	updates := c.bot.ListenForWebhook("/" + config.Conf.Webhook.Token)
 	go func() {
 		err := http.ListenAndServe(config.Conf.Webhook.ListenAddr, nil)

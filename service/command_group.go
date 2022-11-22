@@ -132,7 +132,7 @@ func (c *CommandConfig) dbanCommand() {
 			Length: 2,
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = "某某 " + c.handleUserName + "已经消失的无影无踪"
+		c.messageConfig.Text = "某某 " + c.handleUserName + " 已经消失的无影无踪"
 		c.sendMessage()
 		req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
 			ChatID:    c.update.Message.Chat.ID,
@@ -161,12 +161,6 @@ func (c *CommandConfig) unBanCommand() {
 	})
 	if req.Ok {
 		logrus.Infof("handle_user=%v", c.handleUserID)
-		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-			Type:   "text_mention",
-			Offset: 0,
-			Length: 2,
-			User:   &tgbotapi.User{ID: c.handleUserID},
-		}}
 		c.messageConfig.Text = "群友 " + c.handleUserName + " 获得救赎"
 		c.sendMessage()
 	} else {
@@ -180,9 +174,7 @@ func (c *CommandConfig) rtCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	if c.isApproveCommandRule() {
-		return
-	}
+
 	nowTimestamp := time.Now().Unix()
 	var rtTime int64
 	arg, err := strconv.Atoi(c.commandArg)
@@ -277,14 +269,14 @@ func (c *CommandConfig) warnCommand() {
 			return
 		} else {
 			count = count + 1
-			err := db.RDB.Set(c.ctx, warnKey, count, time.Duration(config.Conf.KeyTTL*1000000000)).Err()
+			err := db.RDB.Set(c.ctx, warnKey, count, time.Second*time.Duration(config.Conf.KeyTTL)).Err()
 			if err != nil {
 				logrus.Error(err)
 			}
 		}
 	} else {
 		count = 1
-		err := db.RDB.Set(c.ctx, warnKey, count, time.Duration(config.Conf.KeyTTL*1000000000)).Err()
+		err := db.RDB.Set(c.ctx, warnKey, count, time.Second*time.Duration(config.Conf.KeyTTL)).Err()
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -321,7 +313,7 @@ func (c *CommandConfig) unWarnCommand() {
 			}
 		} else {
 			count = count - 1
-			err := db.RDB.Set(c.ctx, warnKey, count, time.Duration(config.Conf.KeyTTL)*1000000000).Err()
+			err := db.RDB.Set(c.ctx, warnKey, count, time.Second*time.Duration(config.Conf.KeyTTL)).Err()
 			if err != nil {
 				logrus.Error(err)
 			}

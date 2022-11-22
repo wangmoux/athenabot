@@ -10,14 +10,14 @@ import (
 )
 
 type BotConfig struct {
-	update        *tgbotapi.Update
+	update        tgbotapi.Update
 	bot           *tgbotapi.BotAPI
 	messageConfig tgbotapi.MessageConfig
 	ctx           context.Context
 	cancel        context.CancelFunc
 }
 
-func NewBotConfig(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update *tgbotapi.Update) *BotConfig {
+func NewBotConfig(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update tgbotapi.Update) *BotConfig {
 	botConfig := &BotConfig{
 		ctx:    ctx,
 		cancel: cancel,

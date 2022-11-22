@@ -47,7 +47,7 @@ func (c *MarsConfig) setMars() {
 	marsKey := marsKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + c.marsID
 	c.currentMars.MsgID = c.update.Message.MessageID
 	marsJson, _ := json.Marshal(c.currentMars)
-	if err := db.RDB.Set(c.ctx, marsKey, marsJson, time.Duration(config.Conf.KeyTTL*1000000000)).Err(); err != nil {
+	if err := db.RDB.Set(c.ctx, marsKey, marsJson, time.Second*time.Duration(config.Conf.KeyTTL)).Err(); err != nil {
 		logrus.Error(err)
 	}
 }

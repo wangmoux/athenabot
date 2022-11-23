@@ -92,9 +92,10 @@ func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 			logrus.Error(err)
 		}
 		count += addCount
+	} else {
+		count = addCount
 	}
-	count = addCount
-	err = db.RDB.Set(c.ctx, commandLimitKey, count, time.Duration(86400*time.Second)).Err()
+	err = db.RDB.Set(c.ctx, commandLimitKey, count, 86400*time.Second).Err()
 	if err != nil {
 		logrus.Error(err)
 	}

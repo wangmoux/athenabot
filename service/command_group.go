@@ -34,7 +34,7 @@ func (c *CommandConfig) studyCommand() {
 		return
 	}
 
-	studyTopKey := studyTopKeyDir + util.NumToStr(c.update.Message.Chat.ID)
+	studyTopKey := util.StrBuilder(studyTopKeyDir, util.NumToStr(c.update.Message.Chat.ID))
 	users, err := db.RDB.ZRange(c.ctx, studyTopKey, -3, -1).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -73,7 +73,7 @@ func (c *CommandConfig) studyCommand() {
 			Length: 3,
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = "好学生 " + c.handleUserName + " 恭喜获得学习时间" + util.NumToStr(rtTime) + "分钟"
+		c.messageConfig.Text = util.StrBuilder("好学生 ", c.handleUserName, " 恭喜获得学习时间", util.NumToStr(rtTime), "分钟")
 		c.sendMessage()
 		t := newTopConfig(c.ctx, c.BotConfig)
 		t.setTop(studyTopKeyDir, c.handleUserID, float64(rtTime))
@@ -104,7 +104,7 @@ func (c *CommandConfig) banCommand() {
 			Length: 2,
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = "某某 " + c.handleUserName + " 已经被干掉了"
+		c.messageConfig.Text = util.StrBuilder("某某 ", c.handleUserName, " 已经被干掉了")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -132,7 +132,7 @@ func (c *CommandConfig) dbanCommand() {
 			Length: 2,
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = "某某 " + c.handleUserName + " 已经消失的无影无踪"
+		c.messageConfig.Text = util.StrBuilder("某某 ", c.handleUserName, " 已经消失的无影无踪")
 		c.sendMessage()
 		req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
 			ChatID:    c.update.Message.Chat.ID,
@@ -161,7 +161,7 @@ func (c *CommandConfig) unBanCommand() {
 	})
 	if req.Ok {
 		logrus.Infof("handle_user=%v", c.handleUserID)
-		c.messageConfig.Text = "群友 " + c.handleUserName + " 获得救赎"
+		c.messageConfig.Text = util.StrBuilder("群友 ", c.handleUserName, " 获得救赎")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -198,7 +198,7 @@ func (c *CommandConfig) rtCommand() {
 			Length: 2,
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = "群友 " + c.handleUserName + " 你需要休息" + util.NumToStr(rtTime) + "分钟"
+		c.messageConfig.Text = util.StrBuilder("群友 ", c.handleUserName, " 你需要休息", util.NumToStr(rtTime), "分钟")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -235,7 +235,7 @@ func (c *CommandConfig) unRtCommand() {
 			Length: 2,
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = "群友 " + c.handleUserName + " 可以说话了"
+		c.messageConfig.Text = util.StrBuilder("群友 ", c.handleUserName, " 可以说话了")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -248,7 +248,7 @@ func (c *CommandConfig) warnCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	warnKey := warnKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + util.NumToStr(c.handleUserID)
+	warnKey := util.StrBuilder(warnKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
 	res, err := db.RDB.Exists(c.ctx, warnKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -268,7 +268,7 @@ func (c *CommandConfig) warnCommand() {
 			c.banCommand()
 			return
 		} else {
-			count = count + 1
+			count += 1
 			err := db.RDB.Set(c.ctx, warnKey, count, time.Second*time.Duration(config.Conf.KeyTTL)).Err()
 			if err != nil {
 				logrus.Error(err)
@@ -282,7 +282,7 @@ func (c *CommandConfig) warnCommand() {
 		}
 	}
 	logrus.Infof("handle_user=%v warn_count=%v", c.handleUserID, count)
-	c.messageConfig.Text = "移除警告 " + strconv.Itoa(count) + "/3"
+	c.messageConfig.Text = util.StrBuilder("移除警告 ", strconv.Itoa(count), "/3")
 	c.sendMessage()
 }
 
@@ -292,7 +292,7 @@ func (c *CommandConfig) unWarnCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	warnKey := warnKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + util.NumToStr(c.handleUserID)
+	warnKey := util.StrBuilder(warnKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
 	res, err := db.RDB.Exists(c.ctx, warnKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -312,7 +312,7 @@ func (c *CommandConfig) unWarnCommand() {
 				logrus.Error(err)
 			}
 		} else {
-			count = count - 1
+			count -= 1
 			err := db.RDB.Set(c.ctx, warnKey, count, time.Second*time.Duration(config.Conf.KeyTTL)).Err()
 			if err != nil {
 				logrus.Error(err)
@@ -320,7 +320,7 @@ func (c *CommandConfig) unWarnCommand() {
 		}
 	}
 	logrus.Infof("handle_user=%v warn_count=%v", c.handleUserID, count)
-	c.messageConfig.Text = "警告已经移除 " + strconv.Itoa(count) + "/3"
+	c.messageConfig.Text = util.StrBuilder("警告已经移除 ", strconv.Itoa(count), "/3")
 	c.sendMessage()
 }
 
@@ -330,7 +330,7 @@ func (c *CommandConfig) enable() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	commandSwitchKey := commandSwitchKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":disable_"
+	commandSwitchKey := util.StrBuilder(commandSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
 	switch c.commandArg {
 	case "all":
 		var commands string
@@ -342,10 +342,10 @@ func (c *CommandConfig) enable() {
 			if err != nil {
 				logrus.Error(err)
 			}
-			commands = commands + "/" + command + "\n"
+			commands += util.StrBuilder("/", command, "\n")
 			logrus.Infof("enable_command=%v", command)
 		}
-		c.messageConfig.Text = commands + " 命令已启用"
+		c.messageConfig.Text = util.StrBuilder(commands, " 命令已启用")
 		c.sendMessage()
 	default:
 		if c.commandArg == "disable" || c.commandArg == "enable" {
@@ -359,7 +359,7 @@ func (c *CommandConfig) enable() {
 			logrus.Error(err)
 		}
 		logrus.Infof("enable_command=%v", c.commandArg)
-		c.messageConfig.Text = c.commandArg + "\n命令已启用"
+		c.messageConfig.Text = util.StrBuilder(c.commandArg, "\n命令已启用")
 		c.sendMessage()
 	}
 }
@@ -370,7 +370,7 @@ func (c *CommandConfig) disable() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	commandSwitchKey := commandSwitchKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":disable_"
+	commandSwitchKey := util.StrBuilder(commandSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
 	switch c.commandArg {
 	case "all":
 		var commands string
@@ -382,10 +382,10 @@ func (c *CommandConfig) disable() {
 			if err != nil {
 				logrus.Error(err)
 			}
-			commands = commands + "/" + command + "\n"
+			commands += util.StrBuilder("/", command, "\n")
 			logrus.Infof("disable_command=%v", command)
 		}
-		c.messageConfig.Text = commands + "\n命令已禁用"
+		c.messageConfig.Text = util.StrBuilder(commands, "\n命令已禁用")
 		c.sendMessage()
 	default:
 		if c.commandArg == "disable" || c.commandArg == "enable" {
@@ -399,7 +399,7 @@ func (c *CommandConfig) disable() {
 			logrus.Error(err)
 		}
 		logrus.Infof("disable_command=%v", c.commandArg)
-		c.messageConfig.Text = c.commandArg + " 命令已禁用"
+		c.messageConfig.Text = util.StrBuilder(c.commandArg, " 命令已禁用")
 		c.sendMessage()
 	}
 }

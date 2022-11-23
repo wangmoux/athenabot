@@ -35,7 +35,7 @@ func NewMarsConfig(ctx context.Context, botConfig *BotConfig) *MarsConfig {
 }
 
 func (c *MarsConfig) getMars() {
-	marsKey := marsKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + c.marsID
+	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", c.marsID)
 	res, err := db.RDB.Get(c.ctx, marsKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -44,7 +44,7 @@ func (c *MarsConfig) getMars() {
 }
 
 func (c *MarsConfig) setMars() {
-	marsKey := marsKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + c.marsID
+	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", c.marsID)
 	c.currentMars.MsgID = c.update.Message.MessageID
 	marsJson, _ := json.Marshal(c.currentMars)
 	if err := db.RDB.Set(c.ctx, marsKey, marsJson, time.Second*time.Duration(config.Conf.KeyTTL)).Err(); err != nil {
@@ -53,7 +53,7 @@ func (c *MarsConfig) setMars() {
 }
 
 func (c *MarsConfig) isMarsExists() bool {
-	marsKey := marsKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + c.marsID
+	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", c.marsID)
 	res, err := db.RDB.Exists(c.ctx, marsKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -71,8 +71,8 @@ func (c *MarsConfig) handleMars() {
 		c.setMars()
 
 		humanChatID := c.update.Message.Chat.ID - c.update.Message.Chat.ID - c.update.Message.Chat.ID - 1000000000000
-		LatestMarsMessage := "https://t.me/c/" + util.NumToStr(humanChatID) + "/" + strconv.Itoa(c.latestMars.MsgID)
-		c.messageConfig.Text = "这条愚蠢的消息已经火星" + strconv.Itoa(c.currentMars.Count) + "次了！！!"
+		LatestMarsMessage := util.StrBuilder("https://t.me/c/", util.NumToStr(humanChatID), "/", strconv.Itoa(c.latestMars.MsgID))
+		c.messageConfig.Text = util.StrBuilder("这条愚蠢的消息已经火星", strconv.Itoa(c.currentMars.Count), "次了！！!")
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_link",
 			URL:    LatestMarsMessage,

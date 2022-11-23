@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 func GetFilePHash(url string) (uint64, error) {
@@ -54,4 +55,12 @@ func NumToStr[T int | float64 | int64 | uint64](num T) string {
 		return strconv.FormatUint(uint64(num), 10)
 	}
 	return ""
+}
+
+func StrBuilder(args ...string) string {
+	var builder strings.Builder
+	for _, i := range args {
+		builder.WriteString(i)
+	}
+	return builder.String()
 }

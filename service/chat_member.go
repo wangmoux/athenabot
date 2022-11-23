@@ -42,12 +42,12 @@ func (c *ChatMemberConfig) NewChatMember() {
 					Type:   "text_link",
 					Offset: 8,
 					Length: 2,
-					URL:    "https://t.me/" + c.bot.Self.UserName + "?start=verify_" + util.NumToStr(c.update.Message.Chat.ID),
+					URL:    util.StrBuilder("https://t.me/", c.bot.Self.UserName, "?start=verify_", util.NumToStr(c.update.Message.Chat.ID)),
 				},
 			}
 			c.messageConfig.Text = "欢迎 新群友 【点我】 完成验证就可以说话了"
 			c.sendMessage()
-			chatVerifyKey := chatVerifyKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + util.NumToStr(c.update.Message.From.ID)
+			chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.update.Message.From.ID))
 			err := db.RDB.Set(c.ctx, chatVerifyKey, c.update.Message.Chat.UserName, time.Second*3600).Err()
 			if err != nil {
 				logrus.Error(err)
@@ -60,7 +60,7 @@ func (c *ChatMemberConfig) NewChatMember() {
 
 func (c *ChatMemberConfig) newChatMemberVerify(chatID int64) {
 	logrus.Infof("verify_user=%v", c.update.Message.From.ID)
-	chatVerifyKey := chatVerifyKeyDir + util.NumToStr(chatID) + ":" + util.NumToStr(c.update.Message.From.ID)
+	chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(chatID), ":", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, chatVerifyKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -93,7 +93,7 @@ func (c *ChatMemberConfig) newChatMemberVerify(chatID int64) {
 					Type:   "text_link",
 					Offset: 7,
 					Length: 2,
-					URL:    "https://t.me/" + groupName,
+					URL:    util.StrBuilder("https://t.me/", groupName),
 				},
 			}
 			c.messageConfig.Text = "你可以说话了【点我】进群"

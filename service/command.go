@@ -52,7 +52,7 @@ func NewCommandConfig(ctx context.Context, botConfig *BotConfig) (commandConfig 
 
 func (c *CommandConfig) InCommands() {
 	if _, ok := config.CommandsMap[c.command]; ok {
-		commandSwitchKey := commandSwitchKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":disable_"
+		commandSwitchKey := util.StrBuilder(commandSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
 		res, err := db.RDB.Exists(c.ctx, commandSwitchKey+c.command).Result()
 		if err != nil {
 			logrus.Error(err)
@@ -77,7 +77,7 @@ func (c *CommandConfig) InPrivateCommands() {
 
 func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 	var count int
-	commandLimitKey := commandLimitKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + c.command + "_" + util.NumToStr(c.handleUserID)
+	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.handleUserID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -91,7 +91,7 @@ func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 		if err != nil {
 			logrus.Error(err)
 		}
-		count = count + addCount
+		count += addCount
 	}
 	count = addCount
 	err = db.RDB.Set(c.ctx, commandLimitKey, count, time.Duration(86400*time.Second)).Err()
@@ -103,7 +103,7 @@ func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 
 func (c *CommandConfig) isLimitCommand(limit int) bool {
 	var count int
-	commandLimitKey := commandLimitKeyDir + util.NumToStr(c.update.Message.Chat.ID) + ":" + c.command + "_" + util.NumToStr(c.handleUserID)
+	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.handleUserID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -167,7 +167,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 				return false
 			}
 		}
-		c.handleUserName = c.update.Message.ReplyToMessage.From.FirstName + c.update.Message.ReplyToMessage.From.LastName
+		c.handleUserName = c.update.Message.ReplyToMessage.From.FirstName
 		c.handleUserID = c.update.Message.ReplyToMessage.From.ID
 	} else {
 		// c.canHandleAdmin = true 允许管理员发送单独指令
@@ -176,7 +176,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 			c.sendMessage()
 			return false
 		}
-		c.handleUserName = c.update.Message.From.FirstName + c.update.Message.From.LastName
+		c.handleUserName = c.update.Message.From.FirstName
 		c.handleUserID = c.update.Message.From.ID
 	}
 	return true

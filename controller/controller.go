@@ -25,6 +25,9 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 	logrus.DebugFn(util.LogMarshalFn(update))
 	c := service.NewBotConfig(ctx, cancel, bot, update)
 	if config.Conf.DisableWhitelist || isInWhitelist(update.Message.Chat.UserName, update.Message.Chat.ID) {
+		if config.Conf.Modules.EnableChatLimit {
+			go service.NewChat(c).ChatLimit()
+		}
 		if config.Conf.Modules.EnableMars {
 			if len(update.Message.Photo) > 0 {
 				service.NewMarsConfig(ctx, c).HandlePhoto()

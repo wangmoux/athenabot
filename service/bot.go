@@ -104,6 +104,6 @@ func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64) {
 		}
 		userJson := &simplejson.Json{}
 		userJson, _ = simplejson.NewJson(req.Result)
-		userNameCache[userID] = userJson.Get("user").Get("first_name").MustString() + userJson.Get("user").Get("last_name").MustString()
+		userNameCache[userID] = userJson.Get("user").Get("first_name").MustString()
 	}
 }

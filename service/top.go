@@ -24,7 +24,7 @@ func newTopConfig(ctx context.Context, botConfig *BotConfig) *topConfig {
 }
 
 func (c *topConfig) setTop(topKey string, userID int64, addScore float64) {
-	key := topKey + util.NumToStr(c.update.Message.Chat.ID)
+	key := util.StrBuilder(topKey + util.NumToStr(c.update.Message.Chat.ID))
 	nowTimestampInt := time.Now().UnixMilli()
 	nowTimestampFloat, _ := strconv.ParseFloat("0."+util.NumToStr(nowTimestampInt), 64)
 	var score float64
@@ -53,7 +53,7 @@ func (c *topConfig) setTop(topKey string, userID int64, addScore float64) {
 }
 
 func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
-	key := topKey + util.NumToStr(c.update.Message.Chat.ID)
+	key := util.StrBuilder(topKey, util.NumToStr(c.update.Message.Chat.ID))
 	var topText string
 	resTopUser, err := db.RDB.ZRevRange(c.ctx, key, 0, 9).Result()
 	if err != nil {
@@ -86,8 +86,7 @@ func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
 				}
 			}
 		}
-		text := firstName + " " + topPrefix + util.NumToStr(score) + topSuffix + "\n"
-		topText = topText + text
+		topText += util.StrBuilder(firstName, " ", topPrefix, util.NumToStr(score), topSuffix, "\n")
 	}
 	c.messageConfig.Text = topText
 	c.sendMessage()

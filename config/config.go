@@ -20,6 +20,7 @@ type Modules struct {
 	EnableMars           bool `json:"enable_mars"`
 	EnableCommand        bool `json:"enable_command"`
 	EnablePrivateCommand bool `json:"enable_private_command"`
+	EnableChatLimit      bool `json:"enable_chat_limit"`
 }
 
 type Webhook struct {
@@ -44,7 +45,7 @@ type Config struct {
 	Webhook          Webhook   `json:"webhook"`
 }
 
-var Conf Config
+var Conf *Config
 var PrivateCommandsMap = make(map[string]uint8)
 var CommandsMap = make(map[string]uint8)
 var WhitelistUsernameMap = make(map[string]int)

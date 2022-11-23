@@ -29,6 +29,10 @@ func NewWebhook(bot *tgbotapi.BotAPI) *Webhook {
 }
 
 func (c Polling) Channel() tgbotapi.UpdatesChannel {
+	_, err := c.bot.Request(tgbotapi.DeleteWebhookConfig{})
+	if err != nil {
+		logrus.Error(err)
+	}
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := c.bot.GetUpdatesChan(u)

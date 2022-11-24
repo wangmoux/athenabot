@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -12,6 +13,12 @@ func NewChat(botConfig *BotConfig) *Chat {
 	return &Chat{BotConfig: botConfig}
 }
 
+type chatLimit struct {
+	userID    int64
+	count     int
+	timestamp int64
+}
+
 func (c *Chat) ChatLimit() {
 	timestamp := time.Now().Unix()
 	if group, ok := groupsChatLimit[c.update.Message.Chat.ID]; ok {
@@ -21,16 +28,12 @@ func (c *Chat) ChatLimit() {
 				if timestamp-group.timestamp < 30 {
 					c.messageConfig.Text = "多吃饭少说话"
 					c.sendMessage()
+					logrus.Infof("chat_limit:%+v", group)
 				}
 				group.timestamp = timestamp
 			}
-		} else {
-			group = &chatLimit{
-				userID: c.update.Message.From.ID,
-				count:  1,
-			}
+			return
 		}
-		return
 	}
 	groupsChatLimit[c.update.Message.Chat.ID] = &chatLimit{
 		userID:    c.update.Message.From.ID,

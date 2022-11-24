@@ -20,10 +20,4 @@ var userNameCache = make(map[int64]string)
 
 var unknownUserCache = make(map[int64]uint8)
 
-type chatLimit struct {
-	userID    int64
-	count     int
-	timestamp int64
-}
-
 var groupsChatLimit = make(map[int64]*chatLimit)

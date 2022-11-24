@@ -63,6 +63,7 @@ func chatHandler(ch chatChannel, bot *tgbotapi.BotAPI) {
 			} else {
 				ttl = 600
 			}
+			//go debug(bot, update)
 		case <-time.After(time.Second * time.Duration(ttl)):
 			logrus.Infof("close chat_handler=%v", chatID)
 			chatMap.Delete(chatID)

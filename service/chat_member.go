@@ -31,21 +31,22 @@ func (c *ChatMemberConfig) NewChatMember() {
 			},
 		})
 		if req.Ok {
+			width := util.TGNameWidth(c.update.Message.From.FirstName)
 			c.messageConfig.Entities = []tgbotapi.MessageEntity{
 				{
 					Type:   "text_mention",
 					Offset: 3,
-					Length: 3,
+					Length: width,
 					User:   &tgbotapi.User{ID: user.ID},
 				},
 				{
 					Type:   "text_link",
-					Offset: 8,
+					Offset: 5 + width,
 					Length: 2,
 					URL:    util.StrBuilder("https://t.me/", c.bot.Self.UserName, "?start=verify_", util.NumToStr(c.update.Message.Chat.ID)),
 				},
 			}
-			c.messageConfig.Text = "欢迎 新群友 【点我】 完成验证就可以说话了"
+			c.messageConfig.Text = util.StrBuilder("欢迎 ", c.update.Message.From.FirstName, " 【点我】 完成验证就可以说话了")
 			c.sendMessage()
 			chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.update.Message.From.ID))
 			err := db.RDB.Set(c.ctx, chatVerifyKey, c.update.Message.Chat.UserName, time.Second*3600).Err()

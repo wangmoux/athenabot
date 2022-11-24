@@ -7,6 +7,7 @@ require (
 	github.com/corona10/goimagehash v1.1.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
+	github.com/rivo/uniseg v0.4.3
 	github.com/sirupsen/logrus v1.9.0
 )
 

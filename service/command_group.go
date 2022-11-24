@@ -69,8 +69,8 @@ func (c *CommandConfig) studyCommand() {
 		logrus.Infof("handle_user=%v rt_time=%v", c.handleUserID, rtTime)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
-			Offset: 0,
-			Length: 3,
+			Offset: 4,
+			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
 		c.messageConfig.Text = util.StrBuilder("好学生 ", c.handleUserName, " 恭喜获得学习时间", util.NumToStr(rtTime), "分钟")
@@ -101,10 +101,10 @@ func (c *CommandConfig) banCommand() {
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
-			Length: 2,
+			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = util.StrBuilder("某某 ", c.handleUserName, " 已经被干掉了")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已经被干掉了")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -129,10 +129,10 @@ func (c *CommandConfig) dbanCommand() {
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
-			Length: 2,
+			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = util.StrBuilder("某某 ", c.handleUserName, " 已经消失的无影无踪")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已经消失的无影无踪")
 		c.sendMessage()
 		req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
 			ChatID:    c.update.Message.Chat.ID,
@@ -161,7 +161,7 @@ func (c *CommandConfig) unBanCommand() {
 	})
 	if req.Ok {
 		logrus.Infof("handle_user=%v", c.handleUserID)
-		c.messageConfig.Text = util.StrBuilder("群友 ", c.handleUserName, " 获得救赎")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 获得救赎")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -195,10 +195,10 @@ func (c *CommandConfig) rtCommand() {
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
-			Length: 2,
+			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = util.StrBuilder("群友 ", c.handleUserName, " 你需要休息", util.NumToStr(rtTime), "分钟")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 你需要休息", util.NumToStr(rtTime), "分钟")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -232,10 +232,10 @@ func (c *CommandConfig) unRtCommand() {
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
-			Length: 2,
+			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = util.StrBuilder("群友 ", c.handleUserName, " 可以说话了")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 可以说话了")
 		c.sendMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -282,7 +282,13 @@ func (c *CommandConfig) warnCommand() {
 		}
 	}
 	logrus.Infof("handle_user=%v warn_count=%v", c.handleUserID, count)
-	c.messageConfig.Text = util.StrBuilder("移除警告 ", strconv.Itoa(count), "/3")
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 移除警告 ", strconv.Itoa(count), "/3")
 	c.sendMessage()
 }
 
@@ -320,7 +326,13 @@ func (c *CommandConfig) unWarnCommand() {
 		}
 	}
 	logrus.Infof("handle_user=%v warn_count=%v", c.handleUserID, count)
-	c.messageConfig.Text = util.StrBuilder("警告已经移除 ", strconv.Itoa(count), "/3")
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 警告已经移除 ", strconv.Itoa(count), "/3")
 	c.sendMessage()
 }
 

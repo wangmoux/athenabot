@@ -2,7 +2,9 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/corona10/goimagehash"
+	"github.com/rivo/uniseg"
 	"github.com/sirupsen/logrus"
 	"image/jpeg"
 	"io"
@@ -63,4 +65,18 @@ func StrBuilder(args ...string) string {
 		builder.WriteString(i)
 	}
 	return builder.String()
+}
+
+func TGNameWidth(name string) int {
+	var width int
+	gr := uniseg.NewGraphemes(name)
+	for gr.Next() {
+		if strings.Contains(fmt.Sprintf("%U", gr.Runes()), "U+1F") {
+			width += len(gr.Runes()) * 2
+			continue
+		}
+		width += 1
+
+	}
+	return width
 }

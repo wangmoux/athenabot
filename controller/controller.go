@@ -25,9 +25,17 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 	logrus.DebugFn(util.LogMarshalFn(update))
 	c := service.NewBotConfig(ctx, cancel, bot, update)
 	if config.Conf.DisableWhitelist || isInWhitelist(update.Message.Chat.UserName, update.Message.Chat.ID) {
-		if config.Conf.Modules.EnableChatLimit {
-			go service.NewChat(c).ChatLimit()
-		}
+		func() {
+			if ch, ok := asyncMap[update.Message.Chat.ID]; ok {
+				ch <- c
+				return
+			}
+			logrus.Infof("new async_controller=%v", update.Message.Chat.ID)
+			ch := make(asyncChannel, 10)
+			asyncMap[update.Message.Chat.ID] = ch
+			go asyncController(ch)
+			ch <- c
+		}()
 		if config.Conf.Modules.EnableMars {
 			if len(update.Message.Photo) > 0 {
 				service.NewMarsConfig(ctx, c).HandlePhoto()
@@ -53,6 +61,21 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 			service.NewCommandConfig(ctx, c).InPrivateCommands()
 			return
 
+		}
+	}
+}
+
+var asyncMap = make(map[int64]asyncChannel)
+
+type asyncChannel chan *service.BotConfig
+
+func asyncController(ch asyncChannel) {
+	for {
+		select {
+		case c := <-ch:
+			if config.Conf.Modules.EnableChatLimit {
+				service.NewChat(c).ChatLimit()
+			}
 		}
 	}
 }

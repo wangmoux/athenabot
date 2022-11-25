@@ -6,6 +6,7 @@ import (
 	"github.com/bitly/go-simplejson"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 )
 
@@ -99,7 +100,9 @@ func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64) {
 		})
 		if !req.Ok {
 			logrus.Errorln(req.ErrorCode, err)
-			unknownUserCache[userID] = 0
+			if strings.Contains(req.Description, "user not found") {
+				unknownUserCache[userID] = 0
+			}
 			return
 		}
 		userJson := &simplejson.Json{}

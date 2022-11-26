@@ -41,10 +41,10 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 				service.NewMarsConfig(ctx, c).HandlePhoto()
 				return
 			}
-		}
-		if update.Message.Video != nil {
-			service.NewMarsConfig(ctx, c).HandleVideo()
-			return
+			if update.Message.Video != nil {
+				service.NewMarsConfig(ctx, c).HandleVideo()
+				return
+			}
 		}
 		if config.Conf.Modules.EnableCommand && update.Message.IsCommand() {
 			service.NewCommandConfig(ctx, c).InCommands()

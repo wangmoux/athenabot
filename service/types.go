@@ -8,6 +8,7 @@ const (
 	chatVerifyKeyDir    = "bot:chat_verify:"
 	commandSwitchKeyDir = "bot:command_switch:"
 	commandLimitKeyDir  = "bot:command_limit:"
+	deleteMessageKeyDir = "bot:delete_message:"
 )
 
 var commandsFunc = make(map[string]func(c *CommandConfig))

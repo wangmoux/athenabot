@@ -28,7 +28,7 @@ func (c *CommandConfig) studyCommand() {
 		return
 	}
 
-	if c.isLimitCommand(3) {
+	if c.isLimitCommand(1) {
 		c.messageConfig.Text = "你学的太多了休息一下"
 		c.sendMessage()
 		return

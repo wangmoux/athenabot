@@ -1,21 +1,26 @@
 package service
 
 import (
+	"athenabot/db"
 	"athenabot/util"
 	"context"
 	"github.com/bitly/go-simplejson"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type BotConfig struct {
-	update        tgbotapi.Update
-	bot           *tgbotapi.BotAPI
-	messageConfig tgbotapi.MessageConfig
-	ctx           context.Context
-	cancel        context.CancelFunc
+	update                   tgbotapi.Update
+	bot                      *tgbotapi.BotAPI
+	messageConfig            tgbotapi.MessageConfig
+	ctx                      context.Context
+	cancel                   context.CancelFunc
+	botMessageCleanCountdown int
+	botMessageID             int
 }
 
 func NewBotConfig(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update tgbotapi.Update) *BotConfig {
@@ -48,9 +53,11 @@ func (c *BotConfig) isCloseWork() bool {
 func (c *BotConfig) sendMessage() {
 	msg := tgbotapi.NewMessage(c.update.Message.Chat.ID, c.messageConfig.Text)
 	msg = c.messageConfig
-	_, err := c.bot.Send(msg)
+	req, err := c.bot.Send(msg)
 	if err != nil {
 		logrus.Error(err)
+	} else {
+		c.botMessageID = req.MessageID
 	}
 	logrus.Debugf("send_msg:%v", util.LogMarshal(msg))
 }
@@ -108,5 +115,42 @@ func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64) {
 		userJson := &simplejson.Json{}
 		userJson, _ = simplejson.NewJson(req.Result)
 		userNameCache[userID] = userJson.Get("user").Get("first_name").MustString()
+	}
+}
+
+func (c *BotConfig) CleanDeleteMessage() {
+	logrus.Infof("new clean_delete_message=%v", c.update.Message.Chat.ID)
+	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
+	for {
+		time.Sleep(time.Second * 5)
+		res, err := db.RDB.HGetAll(context.Background(), deleteMessageKey).Result()
+		if err != nil {
+			logrus.Error(err)
+			continue
+		}
+		for k, v := range res {
+			deleteTime, _ := strconv.Atoi(v)
+			if int64(deleteTime) > time.Now().Unix() {
+				continue
+			}
+			messageID, _ := strconv.Atoi(k)
+			req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
+				ChatID:    c.update.Message.Chat.ID,
+				MessageID: messageID,
+			})
+			if !req.Ok {
+				logrus.Errorln(req.ErrorCode, err)
+			}
+			if err := db.RDB.HDel(context.Background(), deleteMessageKey, util.NumToStr(messageID)).Err(); err != nil {
+				logrus.Error(err)
+			}
+		}
+	}
+}
+
+func (c *BotConfig) autoDeleteMessage(delay int, messageID int) {
+	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
+	if err := db.RDB.HMSet(c.ctx, deleteMessageKey, messageID, time.Now().Unix()+int64(delay)).Err(); err != nil {
+		logrus.Error(err)
 	}
 }

@@ -65,6 +65,7 @@ func (c *MarsConfig) isMarsExists() bool {
 }
 
 func (c *MarsConfig) handleMars() {
+	c.botMessageCleanCountdown = 0
 	if c.isMarsExists() {
 		c.getMars()
 		c.currentMars.Count = c.latestMars.Count + 1

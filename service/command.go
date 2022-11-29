@@ -13,17 +13,18 @@ import (
 
 type CommandConfig struct {
 	*BotConfig
-	ctx              context.Context
-	command          string
-	commandArg       string
-	handleUserName   string
-	handleUserID     int64
-	mustReply        bool
-	mustAdmin        bool
-	canHandleAdmin   bool
-	userIsAdmin      bool
-	replyUserIsAdmin bool
-	canHandleSelf    bool
+	ctx                          context.Context
+	command                      string
+	commandArg                   string
+	handleUserName               string
+	handleUserID                 int64
+	mustReply                    bool
+	mustAdmin                    bool
+	canHandleAdmin               bool
+	userIsAdmin                  bool
+	replyUserIsAdmin             bool
+	canHandleSelf                bool
+	commandMessageCleanCountdown int
 }
 
 func NewCommandConfig(ctx context.Context, botConfig *BotConfig) (commandConfig *CommandConfig) {
@@ -58,6 +59,16 @@ func (c *CommandConfig) InCommands() {
 			logrus.Error(err)
 			return
 		}
+		c.botMessageCleanCountdown = 60
+		c.commandMessageCleanCountdown = 60
+		defer func() {
+			if c.commandMessageCleanCountdown > 0 {
+				go c.autoDeleteMessage(c.commandMessageCleanCountdown, c.update.Message.MessageID)
+			}
+			if c.botMessageID > 0 && c.botMessageCleanCountdown > 0 {
+				go c.autoDeleteMessage(c.botMessageCleanCountdown, c.botMessageID)
+			}
+		}()
 		if res == 0 {
 			logrus.Infof("command_user=%v command=%s command_arg=%s", c.update.Message.From.ID, c.command, c.commandArg)
 			commandsFunc[c.command](c)
@@ -77,7 +88,7 @@ func (c *CommandConfig) InPrivateCommands() {
 
 func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 	var count int
-	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.handleUserID))
+	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -104,7 +115,7 @@ func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 
 func (c *CommandConfig) isLimitCommand(limit int) bool {
 	var count int
-	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.handleUserID))
+	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {
 		logrus.Error(err)

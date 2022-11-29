@@ -7,6 +7,7 @@ import (
 	"context"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
+	"sync"
 )
 
 func isInWhitelist(ChatUserName string, chatID int64) bool {
@@ -69,6 +70,8 @@ var asyncMap = make(map[int64]asyncChannel)
 
 type asyncChannel chan *service.BotConfig
 
+var deleteMessageOnce sync.Once
+
 func asyncController(ch asyncChannel) {
 	for {
 		select {
@@ -76,6 +79,9 @@ func asyncController(ch asyncChannel) {
 			if config.Conf.Modules.EnableChatLimit {
 				service.NewChat(c).ChatLimit()
 			}
+			deleteMessageOnce.Do(func() {
+				go c.CleanDeleteMessage()
+			})
 		}
 	}
 }

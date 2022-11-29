@@ -336,7 +336,7 @@ func (c *CommandConfig) unWarnCommand() {
 	c.sendMessage()
 }
 
-func (c *CommandConfig) enable() {
+func (c *CommandConfig) enableCommand() {
 	c.mustAdmin = true
 	c.canHandleAdmin = true
 	if !c.isApproveCommandRule() {
@@ -376,7 +376,7 @@ func (c *CommandConfig) enable() {
 	}
 }
 
-func (c *CommandConfig) disable() {
+func (c *CommandConfig) disableCommand() {
 	c.mustAdmin = true
 	c.canHandleAdmin = true
 	if !c.isApproveCommandRule() {
@@ -414,4 +414,51 @@ func (c *CommandConfig) disable() {
 		c.messageConfig.Text = util.StrBuilder(c.commandArg, " 命令已禁用")
 		c.sendMessage()
 	}
+}
+
+func (c *CommandConfig) doudouCommand() {
+	c.mustReply = true
+	c.canHandleSelf = true
+	c.canHandleNoAdminReply = true
+	if !c.isApproveCommandRule() {
+		return
+	}
+
+	if c.isLimitCommand(1) {
+		c.messageConfig.Text = "该文斗了"
+		c.sendMessage()
+		return
+	}
+
+	nowTimestamp := time.Now().Unix()
+	randTime, _ := rand.Int(rand.Reader, big.NewInt(3))
+	rtTime := randTime.Int64() + 1
+	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
+		ChatMemberConfig: tgbotapi.ChatMemberConfig{
+			ChatID: c.update.Message.Chat.ID,
+			UserID: c.handleUserID,
+		},
+		UntilDate: 60*rtTime + nowTimestamp,
+	})
+	if req.Ok {
+		logrus.Infof("handle_user=%v rt_time=%v", c.handleUserID, 60)
+		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+			Type:   "text_mention",
+			Offset: 0,
+			Length: util.TGNameWidth(c.handleUserName),
+			User:   &tgbotapi.User{ID: c.handleUserID},
+		}}
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtTime), "分钟")
+		c.sendMessage()
+		c.commandLimitAdd(1)
+		t := newTopConfig(c.ctx, c.BotConfig)
+		t.setTop(doudouTopKeyDir, c.handleUserID, float64(1))
+	} else {
+		logrus.Errorln(req.ErrorCode, err)
+	}
+}
+
+func (c *CommandConfig) doudouTopCommand() {
+	t := newTopConfig(c.ctx, c.BotConfig)
+	t.getTop(doudouTopKeyDir, "被斗过", "次")
 }

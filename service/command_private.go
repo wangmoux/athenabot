@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (c *CommandConfig) start() {
+func (c *CommandConfig) startCommand() {
 	commandArgs := strings.FieldsFunc(c.commandArg, func(r rune) bool {
 		return r == '_'
 	})

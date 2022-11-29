@@ -9,6 +9,7 @@ const (
 	commandSwitchKeyDir = "bot:command_switch:"
 	commandLimitKeyDir  = "bot:command_limit:"
 	deleteMessageKeyDir = "bot:delete_message:"
+	doudouTopKeyDir     = "bot:doudou_top:"
 )
 
 var commandsFunc = make(map[string]func(c *CommandConfig))

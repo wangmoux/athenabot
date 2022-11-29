@@ -25,6 +25,7 @@ type CommandConfig struct {
 	replyUserIsAdmin             bool
 	canHandleSelf                bool
 	commandMessageCleanCountdown int
+	canHandleNoAdminReply        bool
 }
 
 func NewCommandConfig(ctx context.Context, botConfig *BotConfig) (commandConfig *CommandConfig) {
@@ -147,34 +148,34 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 	}
 	// c.mustReply = true 必须处理指定消息
 	if c.mustReply && c.update.Message.ReplyToMessage == nil {
-		c.messageConfig.Text = "乐！"
+		c.messageConfig.Text = "搞空气！"
 		c.sendMessage()
 		return false
 	}
 	// c.mustAdmin = true 管理员才能使用的命令
 	if c.mustAdmin && !c.userIsAdmin {
-		c.messageConfig.Text = "仁！"
+		c.messageConfig.Text = "你不行！"
 		c.sendMessage()
 		return false
 	}
 	if c.update.Message.ReplyToMessage != nil {
 		// 不能处理管理员的消息
 		if c.replyUserIsAdmin {
-			c.messageConfig.Text = "义！"
+			c.messageConfig.Text = "你太弱！"
 			c.sendMessage()
 			return false
 		}
 		// c.canHandleSelf = true 允许处理自己的消息
 		if c.canHandleSelf && c.update.Message.From.ID == c.update.Message.ReplyToMessage.From.ID {
 			if c.userIsAdmin {
-				c.messageConfig.Text = "礼！"
+				c.messageConfig.Text = "搞不了！"
 				c.sendMessage()
 				return false
 			}
 		} else {
-			// 处理的不是自己的消息则必须是管理员
-			if !c.userIsAdmin {
-				c.messageConfig.Text = "智！"
+			// 处理的不是自己的消息则必须是管理员 (c.canHandleNoAdminReply = true 除外)
+			if !c.userIsAdmin && !c.canHandleNoAdminReply {
+				c.messageConfig.Text = "搞不成！"
 				c.sendMessage()
 				return false
 			}
@@ -184,7 +185,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 	} else {
 		// c.canHandleAdmin = true 允许管理员发送单独指令
 		if !c.canHandleAdmin && c.userIsAdmin {
-			c.messageConfig.Text = "信！"
+			c.messageConfig.Text = "不受理！"
 			c.sendMessage()
 			return false
 		}
@@ -231,12 +232,18 @@ func init() {
 		c.unWarnCommand()
 	}
 	commandsFunc["start"] = func(c *CommandConfig) {
-		c.start()
+		c.startCommand()
 	}
 	commandsFunc["enable"] = func(c *CommandConfig) {
-		c.enable()
+		c.enableCommand()
 	}
 	commandsFunc["disable"] = func(c *CommandConfig) {
-		c.disable()
+		c.disableCommand()
+	}
+	commandsFunc["doudou"] = func(c *CommandConfig) {
+		c.doudouCommand()
+	}
+	commandsFunc["doudoutop"] = func(c *CommandConfig) {
+		c.doudouTopCommand()
 	}
 }

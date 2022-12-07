@@ -1,4 +1,4 @@
 .id*
 .vs*
-conf/dev-config.json
 app/debug*
+/conf/config-dev.json

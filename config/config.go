@@ -31,6 +31,16 @@ type Webhook struct {
 	Token       string `json:"token"`
 }
 
+type MarsOCR struct {
+	EnableOCR   bool    `json:"enable_ocr"`
+	DocURL      string  `json:"doc_url"`
+	DocProvider string  `json:"doc_provider"`
+	OcrURL      string  `json:"ocr_url"`
+	OcrProvider string  `json:"ocr_provider"`
+	MinPhrase   int     `json:"min_phrase"`
+	MinHitRatio float32 `json:"min_hit_ratio"`
+}
+
 type Config struct {
 	Whitelist        Whitelist `json:"whitelist"`
 	DisableWhitelist bool      `json:"disable_whitelist"`
@@ -43,9 +53,10 @@ type Config struct {
 	Modules          Modules   `json:"modules"`
 	UpdatesType      string    `json:"updates_type"`
 	Webhook          Webhook   `json:"webhook"`
+	MarsOCR          MarsOCR   `json:"mars_ocr"`
 }
 
-var Conf *Config
+var Conf Config
 var PrivateCommandsMap = make(map[string]uint8)
 var CommandsMap = make(map[string]uint8)
 var WhitelistUsernameMap = make(map[string]int)
@@ -92,5 +103,5 @@ func init() {
 		},
 	})
 
-	logrus.Debugf("config:%v", util.LogMarshal(Conf))
+	logrus.Infof("config:%v", util.LogMarshal(Conf))
 }

@@ -23,7 +23,7 @@ func NewChatMemberConfig(ctx context.Context, botConfig *BotConfig) *ChatMemberC
 
 func (c *ChatMemberConfig) NewChatMember() {
 	for _, user := range c.update.Message.NewChatMembers {
-		logrus.Infof("new_user=%v", user.ID)
+		logrus.Infof("new_user:%v", user.ID)
 		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tgbotapi.ChatMemberConfig{
 				ChatID: c.update.Message.Chat.ID,
@@ -60,7 +60,7 @@ func (c *ChatMemberConfig) NewChatMember() {
 }
 
 func (c *ChatMemberConfig) newChatMemberVerify(chatID int64) {
-	logrus.Infof("verify_user=%v", c.update.Message.From.ID)
+	logrus.Infof("verify_user:%v", c.update.Message.From.ID)
 	chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(chatID), ":", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, chatVerifyKey).Result()
 	if err != nil {

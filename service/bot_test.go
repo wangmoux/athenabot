@@ -8,7 +8,7 @@ import (
 
 func TestBotConfig_SendMessage(t *testing.T) {
 	c := &BotConfig{
-		update: &tgbotapi.Update{
+		update: tgbotapi.Update{
 			Message: &tgbotapi.Message{
 				Chat: &tgbotapi.Chat{
 					ID: config.Conf.Whitelist.GroupsId[0],

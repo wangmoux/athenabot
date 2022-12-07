@@ -15,7 +15,7 @@ func RunBot() {
 		logrus.Panic(err)
 	}
 	bot.Debug = false
-	logrus.Infof("bot=%v", bot.Self.UserName)
+	logrus.Infof("bot:%v", bot.Self.UserName)
 	switch config.Conf.UpdatesType {
 	case "webhook":
 		logrus.Info("updates_type=webhook")
@@ -33,7 +33,7 @@ func updatesHandler(client Client) {
 				chatCh <- update
 				continue
 			}
-			logrus.Infof("new chat_handler=%v", update.Message.Chat.ID)
+			logrus.Infof("new chat_handler:%v", update.Message.Chat.ID)
 			updateCh := make(chatChannel, 10)
 			chatMap[update.Message.Chat.ID] = updateCh
 			go chatHandler(updateCh, client.GetBot())
@@ -50,7 +50,7 @@ func chatHandler(ch chatChannel, bot *tgbotapi.BotAPI) {
 	for {
 		select {
 		case update := <-ch:
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 			controller.Controller(ctx, cancel, bot, update)
 			//go debug(bot, update)
 		}

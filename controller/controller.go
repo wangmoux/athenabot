@@ -31,7 +31,7 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 				ch <- c
 				return
 			}
-			logrus.Infof("new async_controller=%v", update.Message.Chat.ID)
+			logrus.Infof("new async_controller:%v", update.Message.Chat.ID)
 			ch := make(asyncChannel, 10)
 			asyncMap[update.Message.Chat.ID] = ch
 			go asyncController(ch)

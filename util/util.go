@@ -5,29 +5,62 @@ import (
 	"fmt"
 	"github.com/corona10/goimagehash"
 	"github.com/rivo/uniseg"
-	"github.com/sirupsen/logrus"
 	"image/jpeg"
 	"io"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
-func GetFilePHash(url string) (uint64, error) {
+//func StrArrayWords(s []string) int {
+//	var words int
+//	for _, i := range s {
+//		words += utf8.RuneCountInString(i)
+//	}
+//	return words
+//}
+
+func SimpleImagePhrases(s []string) []string {
+	sm := make(map[string]uint8)
+	var sa []string
+	for _, i := range s {
+		if utf8.RuneCountInString(i) < 5 {
+			continue
+		}
+		for _, v := range i {
+			if unicode.Is(unicode.Han, v) {
+				if _, ok := sm[i]; !ok {
+					sa = append(sa, i)
+					sm[i] = 0
+					continue
+				}
+			}
+		}
+	}
+	return sa
+}
+
+func GetFileResponse(url string) (*http.Response, error) {
 	res, err := http.Get(url)
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func GetFilePHash(body io.Reader) (uint64, error) {
+	img, err := jpeg.Decode(body)
 	if err != nil {
 		return 0, err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			logrus.Error(err)
-		}
-	}(res.Body)
-	img, _ := jpeg.Decode(res.Body)
-	PHash, _ := goimagehash.PerceptionHash(img)
-	return PHash.GetHash(), nil
+	pHash, err := goimagehash.PerceptionHash(img)
+	if err != nil {
+		return 0, err
+	}
+	return pHash.GetHash(), nil
 }
 
 func LogMarshal(v any) string {

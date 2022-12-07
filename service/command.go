@@ -60,8 +60,8 @@ func (c *CommandConfig) InCommands() {
 			logrus.Error(err)
 			return
 		}
-		c.botMessageCleanCountdown = 60
-		c.commandMessageCleanCountdown = 60
+		c.botMessageCleanCountdown = 300
+		c.commandMessageCleanCountdown = 300
 		defer func() {
 			if c.commandMessageCleanCountdown > 0 {
 				go c.autoDeleteMessage(c.commandMessageCleanCountdown, c.update.Message.MessageID)
@@ -71,7 +71,7 @@ func (c *CommandConfig) InCommands() {
 			}
 		}()
 		if res == 0 {
-			logrus.Infof("command_user=%v command=%s command_arg=%s", c.update.Message.From.ID, c.command, c.commandArg)
+			logrus.Infof("command_user:%v command:%s command_arg:%s", c.update.Message.From.ID, c.command, c.commandArg)
 			commandsFunc[c.command](c)
 		} else {
 			c.messageConfig.Text = "该命令已禁用"
@@ -82,7 +82,7 @@ func (c *CommandConfig) InCommands() {
 
 func (c *CommandConfig) InPrivateCommands() {
 	if _, ok := config.PrivateCommandsMap[c.command]; ok {
-		logrus.Infof("command_user=%v command=%s command_arg=%s", c.update.Message.From.ID, c.command, c.commandArg)
+		logrus.Infof("command_user:%v command:%s command_arg:%s", c.update.Message.From.ID, c.command, c.commandArg)
 		commandsFunc[c.command](c)
 	}
 }
@@ -198,7 +198,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 func init() {
 	defer func() {
 		for i := range commandsFunc {
-			logrus.Infof("registr_command=%v", i)
+			logrus.Infof("registr_command:%v", i)
 		}
 	}()
 	commandsFunc["studytop"] = func(c *CommandConfig) {

@@ -28,7 +28,7 @@ func (c *CommandConfig) studyCommand() {
 		return
 	}
 
-	if c.isLimitCommand(1) {
+	if c.isLimitCommand(2) {
 		c.messageConfig.Text = "你学的太多了休息一下"
 		c.sendMessage()
 		return
@@ -66,7 +66,7 @@ func (c *CommandConfig) studyCommand() {
 		UntilDate: rtTime*60 + nowTimestamp,
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v rt_time=%v", c.handleUserID, rtTime)
+		logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtTime)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 4,
@@ -97,7 +97,7 @@ func (c *CommandConfig) banCommand() {
 		},
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v", c.handleUserID)
+		logrus.Infof("handle_user:%v", c.handleUserID)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
@@ -125,7 +125,7 @@ func (c *CommandConfig) dbanCommand() {
 		RevokeMessages: true,
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v", c.handleUserID)
+		logrus.Infof("handle_user:%v", c.handleUserID)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
@@ -160,7 +160,7 @@ func (c *CommandConfig) unBanCommand() {
 		},
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v", c.handleUserID)
+		logrus.Infof("handle_user:%v", c.handleUserID)
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 获得救赎")
 		c.sendMessage()
 	} else {
@@ -191,7 +191,7 @@ func (c *CommandConfig) rtCommand() {
 		UntilDate: rtTime*60 + nowTimestamp,
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v rt_time=%v", c.handleUserID, rtTime)
+		logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtTime)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
@@ -228,7 +228,7 @@ func (c *CommandConfig) unRtCommand() {
 		},
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v", c.handleUserID)
+		logrus.Infof("handle_user:%v", c.handleUserID)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
@@ -281,7 +281,7 @@ func (c *CommandConfig) warnCommand() {
 			logrus.Error(err)
 		}
 	}
-	logrus.Infof("handle_user=%v warn_count=%v", c.handleUserID, count)
+	logrus.Infof("handle_user:%v warn_count:%v", c.handleUserID, count)
 	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 		Type:   "text_mention",
 		Offset: 0,
@@ -325,7 +325,7 @@ func (c *CommandConfig) unWarnCommand() {
 			}
 		}
 	}
-	logrus.Infof("handle_user=%v warn_count=%v", c.handleUserID, count)
+	logrus.Infof("handle_user:%v warn_count:%v", c.handleUserID, count)
 	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 		Type:   "text_mention",
 		Offset: 0,
@@ -355,7 +355,7 @@ func (c *CommandConfig) enableCommand() {
 				logrus.Error(err)
 			}
 			commands += util.StrBuilder("/", command, "\n")
-			logrus.Infof("enable_command=%v", command)
+			logrus.Infof("enable_command:%v", command)
 		}
 		c.messageConfig.Text = util.StrBuilder(commands, " 命令已启用")
 		c.sendMessage()
@@ -370,7 +370,7 @@ func (c *CommandConfig) enableCommand() {
 		if err != nil {
 			logrus.Error(err)
 		}
-		logrus.Infof("enable_command=%v", c.commandArg)
+		logrus.Infof("enable_command:%v", c.commandArg)
 		c.messageConfig.Text = util.StrBuilder(c.commandArg, "\n命令已启用")
 		c.sendMessage()
 	}
@@ -395,7 +395,7 @@ func (c *CommandConfig) disableCommand() {
 				logrus.Error(err)
 			}
 			commands += util.StrBuilder("/", command, "\n")
-			logrus.Infof("disable_command=%v", command)
+			logrus.Infof("disable_command:%v", command)
 		}
 		c.messageConfig.Text = util.StrBuilder(commands, "\n命令已禁用")
 		c.sendMessage()
@@ -410,7 +410,7 @@ func (c *CommandConfig) disableCommand() {
 		if err != nil {
 			logrus.Error(err)
 		}
-		logrus.Infof("disable_command=%v", c.commandArg)
+		logrus.Infof("disable_command:%v", c.commandArg)
 		c.messageConfig.Text = util.StrBuilder(c.commandArg, " 命令已禁用")
 		c.sendMessage()
 	}
@@ -424,31 +424,79 @@ func (c *CommandConfig) doudouCommand() {
 		return
 	}
 
-	if c.isLimitCommand(1) {
-		c.messageConfig.Text = "该文斗了"
-		c.sendMessage()
+	rtTimestamp := time.Now().Unix()
+	chatMember, err := c.getChatMember(c.handleUserID)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	if !chatMember.CanSendMessages && chatMember.Status == "restricted" {
+		if chatMember.UntilDate > rtTimestamp {
+			rtTimestamp += chatMember.UntilDate - rtTimestamp
+		} else {
+			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+				Type:   "text_mention",
+				Offset: 0,
+				Length: util.TGNameWidth(c.handleUserName),
+				User:   &tgbotapi.User{ID: c.handleUserID},
+			}}
+			c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已经被打倒不用在斗了")
+			c.sendMessage()
+			return
+		}
+	}
+	if c.isLimitCommand(2) {
+		rtTimestamp += 180
+		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
+			ChatMemberConfig: tgbotapi.ChatMemberConfig{
+				ChatID: c.update.Message.Chat.ID,
+				UserID: c.update.Message.From.ID,
+			},
+			UntilDate: rtTimestamp,
+		})
+		if req.Ok {
+			logrus.Infof("handle_user:%v rt_time:%v", c.update.Message.From.ID, 3)
+			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+				Type:   "text_mention",
+				Offset: 0,
+				Length: util.TGNameWidth(c.update.Message.From.FirstName),
+				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
+			}}
+			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 斗人不成被反斗", "3", "分钟")
+			c.sendMessage()
+		} else {
+			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+				Type:   "text_mention",
+				Offset: 0,
+				Length: util.TGNameWidth(c.update.Message.From.FirstName),
+				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
+			}}
+			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 这人有点厉害反弹不了")
+			c.sendMessage()
+			logrus.Warningln(req.ErrorCode, err)
+		}
 		return
 	}
 
-	nowTimestamp := time.Now().Unix()
 	randTime, _ := rand.Int(rand.Reader, big.NewInt(3))
-	rtTime := randTime.Int64() + 1
+	rtMin := randTime.Int64() + 1
+	rtTimestamp += rtMin * 60
 	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
 			ChatID: c.update.Message.Chat.ID,
 			UserID: c.handleUserID,
 		},
-		UntilDate: 60*rtTime + nowTimestamp,
+		UntilDate: rtTimestamp,
 	})
 	if req.Ok {
-		logrus.Infof("handle_user=%v rt_time=%v", c.handleUserID, 60)
+		logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtMin)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
 			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtTime), "分钟")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtMin), "分钟")
 		c.sendMessage()
 		c.commandLimitAdd(1)
 		t := newTopConfig(c.ctx, c.BotConfig)

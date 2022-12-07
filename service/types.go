@@ -1,5 +1,7 @@
 package service
 
+import "sync"
+
 const (
 	marsKeyDir          = "bot:mars_data:"
 	marsTopKeyDir       = "bot:mars_top:"
@@ -23,3 +25,5 @@ var userNameCache = make(map[int64]string)
 var unknownUserCache = make(map[int64]uint8)
 
 var groupsChatLimit = make(map[int64]*chatLimit)
+
+var userNameCacheLock sync.RWMutex

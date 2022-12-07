@@ -4,6 +4,7 @@ import (
 	"athenabot/db"
 	"athenabot/util"
 	"context"
+	"encoding/json"
 	"github.com/bitly/go-simplejson"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
@@ -114,12 +115,14 @@ func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64) {
 		}
 		userJson := &simplejson.Json{}
 		userJson, _ = simplejson.NewJson(req.Result)
+		defer userNameCacheLock.Unlock()
+		userNameCacheLock.Lock()
 		userNameCache[userID] = userJson.Get("user").Get("first_name").MustString()
 	}
 }
 
 func (c *BotConfig) CleanDeleteMessage() {
-	logrus.Infof("new clean_delete_message=%v", c.update.Message.Chat.ID)
+	logrus.Infof("new clean_delete_message:%v", c.update.Message.Chat.ID)
 	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
 	for {
 		time.Sleep(time.Second * 5)
@@ -139,7 +142,7 @@ func (c *BotConfig) CleanDeleteMessage() {
 				MessageID: messageID,
 			})
 			if !req.Ok {
-				logrus.Errorln(req.ErrorCode, err)
+				logrus.Warnln(req.ErrorCode, err)
 			}
 			if err := db.RDB.HDel(context.Background(), deleteMessageKey, util.NumToStr(messageID)).Err(); err != nil {
 				logrus.Error(err)
@@ -153,4 +156,20 @@ func (c *BotConfig) autoDeleteMessage(delay int, messageID int) {
 	if err := db.RDB.HMSet(c.ctx, deleteMessageKey, messageID, time.Now().Unix()+int64(delay)).Err(); err != nil {
 		logrus.Error(err)
 	}
+}
+
+func (c *BotConfig) getChatMember(userID int64) (tgbotapi.ChatMember, error) {
+	req, err := c.bot.Request(tgbotapi.GetChatMemberConfig{
+		ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
+			ChatID: c.update.Message.Chat.ID,
+			UserID: userID,
+		},
+	})
+	var chatMember tgbotapi.ChatMember
+	if req.Ok {
+		_ = json.Unmarshal(req.Result, &chatMember)
+	} else {
+		return chatMember, err
+	}
+	return chatMember, nil
 }

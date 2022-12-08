@@ -113,7 +113,7 @@ func (c *MarsConfig) HandlePhoto() {
 	if c.isMarsExists() {
 		c.handleMars()
 	} else {
-		if config.Conf.MarsOCR.EnableOCR && !c.isMarsExists() {
+		if config.Conf.MarsOCR.EnableOCR && c.IsEnableChatService("chat_mars_ocr") {
 			c.HandleImageDoc(bytes.NewBuffer(fileByte), pHash)
 		} else {
 			c.setMars()

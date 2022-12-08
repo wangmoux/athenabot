@@ -1,4 +1,13 @@
 {
+  "mars_ocr": {
+    "enable_ocr": true,
+    "doc_provider": "mongo",
+    "doc_url": "mongodb://localhost:27017",
+    "ocr_url": "http://localhost:8080/ocr",
+    "ocr_provider": "azure",
+    "min_phrase": 6,
+    "min_hit_ratio": 0.6
+  },
   "updates_type": "polling",
   "webhook": {
     "endpoint": "https://example.com:8443/",
@@ -36,7 +45,12 @@
     "enable",
     "disable",
     "warn",
-    "unwarn"
+    "unwarn",
+    "doudou",
+    "chat_member_verify",
+    "chat_limit",
+    "chat_mars",
+    "chat_mars_ocr"
   ],
   "private_commands": [
     "start"

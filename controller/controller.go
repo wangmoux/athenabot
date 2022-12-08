@@ -37,7 +37,7 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 			go asyncController(ch)
 			ch <- c
 		}()
-		if config.Conf.Modules.EnableMars {
+		if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") {
 			if len(update.Message.Photo) > 0 {
 				service.NewMarsConfig(ctx, c).HandlePhoto()
 				return
@@ -46,14 +46,15 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 				service.NewMarsConfig(ctx, c).HandleVideo()
 				return
 			}
+
 		}
 		if config.Conf.Modules.EnableCommand && update.Message.IsCommand() {
 			service.NewCommandConfig(ctx, c).InCommands()
 			return
 		}
 
-		if config.Conf.Modules.EnableMemberVerify && len(update.Message.NewChatMembers) > 0 {
-			service.NewChatMemberConfig(ctx, c).NewChatMember()
+		if config.Conf.Modules.EnableMemberVerify && c.IsEnableChatService("chat_member_verify") && len(update.Message.NewChatMembers) > 0 {
+			service.NewChatMemberConfig(ctx, c).NewChatMemberVerify()
 			return
 		}
 	}
@@ -76,7 +77,7 @@ func asyncController(ch asyncChannel) {
 	for {
 		select {
 		case c := <-ch:
-			if config.Conf.Modules.EnableChatLimit {
+			if config.Conf.Modules.EnableChatLimit && c.IsEnableChatService("chat_limit") {
 				service.NewChat(c).ChatLimit()
 			}
 			deleteMessageOnce.Do(func() {

@@ -54,10 +54,8 @@ func NewCommandConfig(ctx context.Context, botConfig *BotConfig) (commandConfig 
 
 func (c *CommandConfig) InCommands() {
 	if _, ok := config.CommandsMap[c.command]; ok {
-		commandSwitchKey := util.StrBuilder(commandSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
-		res, err := db.RDB.Exists(c.ctx, commandSwitchKey+c.command).Result()
-		if err != nil {
-			logrus.Error(err)
+		if _, _ok := commandsFunc[c.command]; !_ok {
+			logrus.Warnf("command not registered:%v", c.command)
 			return
 		}
 		c.botMessageCleanCountdown = 300
@@ -70,20 +68,25 @@ func (c *CommandConfig) InCommands() {
 				go c.autoDeleteMessage(c.botMessageCleanCountdown, c.botMessageID)
 			}
 		}()
-		if res == 0 {
+		if c.IsEnableChatService(c.command) {
 			logrus.Infof("command_user:%v command:%s command_arg:%s", c.update.Message.From.ID, c.command, c.commandArg)
 			commandsFunc[c.command](c)
 		} else {
-			c.messageConfig.Text = "该命令已禁用"
-			c.sendMessage()
+			logrus.Warnf("command disabled:%v", c.command)
 		}
 	}
 }
 
 func (c *CommandConfig) InPrivateCommands() {
 	if _, ok := config.PrivateCommandsMap[c.command]; ok {
+		if _, _ok := commandsFunc[c.command]; !_ok {
+			logrus.Warnf("command not registered:%v", c.command)
+			return
+		}
 		logrus.Infof("command_user:%v command:%s command_arg:%s", c.update.Message.From.ID, c.command, c.commandArg)
 		commandsFunc[c.command](c)
+	} else {
+		logrus.Warnf("command disabled:%v", c.command)
 	}
 }
 

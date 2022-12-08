@@ -342,7 +342,7 @@ func (c *CommandConfig) enableCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	commandSwitchKey := util.StrBuilder(commandSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
+	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
 	switch c.commandArg {
 	case "all":
 		var commands string
@@ -382,7 +382,7 @@ func (c *CommandConfig) disableCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	commandSwitchKey := util.StrBuilder(commandSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
+	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
 	switch c.commandArg {
 	case "all":
 		var commands string

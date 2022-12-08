@@ -173,3 +173,16 @@ func (c *BotConfig) getChatMember(userID int64) (tgbotapi.ChatMember, error) {
 	}
 	return chatMember, nil
 }
+
+func (c *BotConfig) IsEnableChatService(service string) bool {
+	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
+	res, err := db.RDB.Exists(c.ctx, util.StrBuilder(commandSwitchKey, service)).Result()
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	if res > 0 {
+		return false
+	}
+	return true
+}

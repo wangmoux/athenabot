@@ -17,7 +17,7 @@ func (c *CommandConfig) startCommand() {
 			if err != nil {
 				return
 			}
-			NewChatMemberConfig(c.ctx, c.BotConfig).newChatMemberVerify(int64(chatID))
+			NewChatMemberConfig(c.ctx, c.BotConfig).chatMemberVerify(int64(chatID))
 		}
 	}
 }

@@ -8,7 +8,7 @@ const (
 	studyTopKeyDir      = "bot:study_top:"
 	warnKeyDir          = "bot:warn_data:"
 	chatVerifyKeyDir    = "bot:chat_verify:"
-	commandSwitchKeyDir = "bot:command_switch:"
+	serviceSwitchKeyDir = "bot:service_switch:"
 	commandLimitKeyDir  = "bot:command_limit:"
 	deleteMessageKeyDir = "bot:delete_message:"
 	doudouTopKeyDir     = "bot:doudou_top:"

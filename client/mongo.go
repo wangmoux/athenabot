@@ -45,7 +45,7 @@ func (m *MongoClient) searchImageDoc(chatID int64, phrase string) ([]*model.Imag
 	var imageDocs []*model.ImageDoc
 	filter := bson.D{{"chat_id", chatID},
 		{"$text", bson.D{{"$search", util.StrBuilder("\"", phrase, "\"")}}}}
-	cursor, err := coll.Find(context.Background(), filter)
+	cursor, err := coll.Find(context.Background(), filter, options.Find().SetLimit(searchLimit))
 	if err != nil {
 		return imageDocs, err
 	}

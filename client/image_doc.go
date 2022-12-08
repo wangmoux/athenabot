@@ -31,6 +31,8 @@ var ImageDocProvider = make(map[string]func(string) ImageDocClient)
 var docClient ImageDocClient
 var docClientOnce sync.Once
 
+const searchLimit = 10
+
 func init() {
 	defer func() {
 		for i := range ImageDocProvider {

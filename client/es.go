@@ -4,9 +4,7 @@ import (
 	"athenabot/model"
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/olivere/elastic/v7"
-	"time"
 )
 
 type EsClient struct {
@@ -25,13 +23,8 @@ func newEsClient(url string) (ImageDocClient, error) {
 func (e *EsClient) set() {
 	e.name = model.ImageDocIndexName
 }
-func timeCost(start time.Time) {
-	terminal := time.Since(start)
-	fmt.Println(terminal)
-}
 
 func (e *EsClient) addImageDoc(imageDoc *model.ImageDoc) error {
-	defer timeCost(time.Now())
 	e.set()
 	_, err := e.Index().Index(e.name).BodyJson(imageDoc).Do(context.Background())
 	if err != nil {
@@ -45,7 +38,7 @@ func (e *EsClient) searchImageDoc(chatID int64, phrase string) ([]*model.ImageDo
 	boolQuery := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("chat_id", chatID),
 		elastic.NewMatchQuery("image_phrases", phrase))
-	res, err := e.Search(e.name).Query(boolQuery).Do(context.Background())
+	res, err := e.Search(e.name).Query(boolQuery).Size(searchLimit).Do(context.Background())
 	if err != nil {
 		return nil, err
 	}

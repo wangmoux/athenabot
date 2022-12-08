@@ -42,26 +42,21 @@ func (m *MysqlClient) addImageDoc(doc *model.ImageDoc) error {
 
 func (m *MysqlClient) searchImageDoc(chatID int64, phrase string) ([]*model.ImageDoc, error) {
 	var _imageDocs []model.MysqlImageDoc
-	sql := "MATCH (image_phrases) AGAINST (? IN NATURAL LANGUAGE MODE) AND chat_id = ?"
-	err := m.Where(sql, phrase, chatID).Find(&_imageDocs).Error
+	sql := util.StrBuilder("MATCH (image_phrases) AGAINST (", "'\"", phrase, "\"'", " IN BOOLEAN MODE) AND chat_id = ?")
+	err := m.Limit(searchLimit).Where(sql, chatID).Find(&_imageDocs).Error
 	if err != nil {
 		return nil, err
 	}
 	var imageDocs []*model.ImageDoc
 	for _, item := range _imageDocs {
-		imagePhrases := strings.Split(strings.TrimSpace(item.ImagePhrases), "\n")
-		for _, p := range imagePhrases {
-			if p == phrase {
-				t, _ := time.Parse("2006-01-02 15:04:05", item.CreateTime)
-				imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
-				imageDoc.ImagePhrases = strings.Split(strings.TrimSpace(item.ImagePhrases), "\n")
-				imageDoc.MarsID = item.MarsID
-				imageDoc.ChatID = item.ChatID
-				imageDoc.CreateTime = t
-				imageDocs = append(imageDocs, imageDoc)
-				model.ImageDocPool.Put(imageDoc)
-			}
-		}
+		t, _ := time.Parse("2006-01-02 15:04:05", item.CreateTime)
+		imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
+		imageDoc.ImagePhrases = strings.Split(strings.TrimSpace(item.ImagePhrases), "\n")
+		imageDoc.MarsID = item.MarsID
+		imageDoc.ChatID = item.ChatID
+		imageDoc.CreateTime = t
+		imageDocs = append(imageDocs, imageDoc)
+		model.ImageDocPool.Put(imageDoc)
 	}
 	return imageDocs, nil
 }

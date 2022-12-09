@@ -166,7 +166,7 @@ func (c *MarsConfig) HandleImageDoc(image io.Reader, pHash uint64) {
 	_ = json.Unmarshal(imagePhrasesRes, &imagePhrases)
 	logrus.Debugf("image_phrases:%v", imagePhrases)
 
-	simpleImagePhrases := util.SimpleImagePhrases(imagePhrases.ImagePhrases)
+	simpleImagePhrases := util.SimpleStrArray(imagePhrases.ImagePhrases, 15)
 	imageDoc.ImagePhrases = simpleImagePhrases
 	logrus.Debugf("simple_image_phrases:%v", simpleImagePhrases)
 

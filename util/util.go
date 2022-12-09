@@ -11,8 +11,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 )
 
 //func StrArrayWords(s []string) int {
@@ -23,24 +21,19 @@ import (
 //	return words
 //}
 
-func SimpleImagePhrases(s []string) []string {
-	sm := make(map[string]uint8)
-	var sa []string
-	for _, i := range s {
-		if utf8.RuneCountInString(i) < 5 {
+func SimpleStrArray(strArray []string, minLen int) []string {
+	duplicateMap := make(map[string]uint8)
+	var strArrayRes []string
+	for _, str := range strArray {
+		if len(str) < minLen {
 			continue
 		}
-		for _, v := range i {
-			if unicode.Is(unicode.Han, v) {
-				if _, ok := sm[i]; !ok {
-					sa = append(sa, i)
-					sm[i] = 0
-					continue
-				}
-			}
+		if _, ok := duplicateMap[str]; !ok {
+			strArrayRes = append(strArrayRes, str)
+			duplicateMap[str] = 0
 		}
 	}
-	return sa
+	return strArrayRes
 }
 
 func GetFileResponse(url string) (*http.Response, error) {

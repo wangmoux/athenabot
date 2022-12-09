@@ -166,7 +166,7 @@ func (c *MarsConfig) HandleImageDoc(image io.Reader, pHash uint64) {
 	_ = json.Unmarshal(imagePhrasesRes, &imagePhrases)
 	logrus.Debugf("image_phrases:%v", imagePhrases)
 
-	simpleImagePhrases := util.SimpleImagePhrases(imagePhrases.ImagePhrases)
+	simpleImagePhrases := util.SimpleStrArray(imagePhrases.ImagePhrases, 15)
 	imageDoc.ImagePhrases = simpleImagePhrases
 	logrus.Debugf("simple_image_phrases:%v", simpleImagePhrases)
 
@@ -185,7 +185,7 @@ func (c *MarsConfig) HandleImageDoc(image io.Reader, pHash uint64) {
 		}
 		for _, item := range imageDocs {
 			lenRatio := float32(simpleImagePhrasesLen) / float32(len(item.ImagePhrases))
-			if lenRatio > config.Conf.MarsOCR.MinHitRatio && lenRatio < config.Conf.MarsOCR.MinHitRatio*3 {
+			if lenRatio > config.Conf.MarsOCR.MinHitRatio && lenRatio < 1-config.Conf.MarsOCR.MinHitRatio+1 {
 				if _, ok := hitPhraseMap[item.MarsID]; ok {
 					hitPhraseMap[item.MarsID] += 1
 				} else {

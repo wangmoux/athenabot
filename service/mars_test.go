@@ -32,3 +32,19 @@ func TestMarsConfig_HandlePhoto(t *testing.T) {
 	m := NewMarsConfig(ctx, NewBotConfig(ctx, cancel, bot, update))
 	m.HandlePhoto()
 }
+
+func TestMarsConfig_handleImageDoc(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	update := tgbotapi.Update{
+		Message: &tgbotapi.Message{
+			MessageID: 1,
+			Chat: &tgbotapi.Chat{
+				ID: -1001546229241,
+			},
+			From: &tgbotapi.User{},
+		},
+	}
+	m := NewMarsConfig(ctx, NewBotConfig(ctx, cancel, &tgbotapi.BotAPI{}, update))
+	imagePhrases := []string{"用户", "你去月球了", "评论", "1000", "2022-11.11 12:11"}
+	m.handleImageDoc(imagePhrases, 123456789)
+}

@@ -13,25 +13,6 @@ import (
 	"strings"
 )
 
-//func StrArrayWords(s []string) int {
-//	var words int
-//	for _, i := range s {
-//		words += utf8.RuneCountInString(i)
-//	}
-//	return words
-//}
-
-func SimpleStrArray(strArray []string, minLen int) []string {
-	var strArrayRes []string
-	for _, str := range strArray {
-		if len(str) < minLen {
-			continue
-		}
-		strArrayRes = append(strArrayRes, str)
-	}
-	return strArrayRes
-}
-
 func GetFileResponse(url string) (*http.Response, error) {
 	res, err := http.Get(url)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
-	"io"
 	"io/ioutil"
 	"time"
 )
@@ -114,7 +113,12 @@ func (c *MarsConfig) HandlePhoto() {
 		c.handleMars()
 	} else {
 		if config.Conf.MarsOCR.EnableOCR && c.IsEnableChatService("chat_mars_ocr") {
-			c.HandleImageDoc(bytes.NewBuffer(fileByte), pHash)
+			imagePhrases, err := getImageOCR(bytes.NewBuffer(fileByte))
+			if err != nil {
+				logrus.Error(err)
+				return
+			}
+			c.handleImageDoc(imagePhrases, pHash)
 		} else {
 			c.setMars()
 		}
@@ -130,7 +134,7 @@ func (c *MarsConfig) HandleVideo() {
 	}
 }
 
-func (c *MarsConfig) HandleImageDoc(image io.Reader, pHash uint64) {
+func (c *MarsConfig) handleImageDoc(imagePhrases []string, pHash uint64) {
 	var noSetMars bool
 	defer func() {
 		if !noSetMars {
@@ -138,19 +142,9 @@ func (c *MarsConfig) HandleImageDoc(image io.Reader, pHash uint64) {
 		}
 	}()
 
-	ocrReq := client.NewRequestFD(config.Conf.MarsOCR.OcrURL, "POST")
-	ocrReq.TimeOut = time.Second * 30
-	ocrReq.File = &client.File{
-		FileName: "file",
-		File:     image,
-	}
-	ocrReq.Head = make(map[string]string)
-	ocrReq.Head["ocr-type"] = config.Conf.MarsOCR.OcrProvider
-	imagePhrasesRes, err := ocrReq.Do()
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
+	logrus.Debugf("image_phrases:%v", imagePhrases)
+
+	simpleImagePhrases := generateSimpleImagePhrases(imagePhrases)
 	imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
 	imageDoc = &model.ImageDoc{
 		MarsID:     util.NumToStr(pHash),
@@ -158,15 +152,6 @@ func (c *MarsConfig) HandleImageDoc(image io.Reader, pHash uint64) {
 		CreateTime: time.Now().UTC(),
 	}
 	defer model.ImageDocPool.Put(imageDoc)
-
-	type ImagePhrases struct {
-		ImagePhrases []string `json:"image_phrases"`
-	}
-	imagePhrases := ImagePhrases{}
-	_ = json.Unmarshal(imagePhrasesRes, &imagePhrases)
-	logrus.Debugf("image_phrases:%v", imagePhrases)
-
-	simpleImagePhrases := util.SimpleStrArray(imagePhrases.ImagePhrases, 15)
 	imageDoc.ImagePhrases = simpleImagePhrases
 	logrus.Debugf("simple_image_phrases:%v", simpleImagePhrases)
 

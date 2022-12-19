@@ -23,8 +23,11 @@ func getImageOCR(image io.Reader) ([]string, error) {
 		return nil, err
 	}
 	resJson := &simplejson.Json{}
-	resJson, _ = simplejson.NewJson(imagePhrasesRes)
-	return resJson.Get("image_phrases").MustStringArray(), err
+	resJson, err = simplejson.NewJson(imagePhrasesRes)
+	if err != nil {
+		return nil, err
+	}
+	return resJson.Get("image_phrases").MustStringArray(), nil
 }
 
 func generateSimpleImagePhrases(strArray []string) []string {

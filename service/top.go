@@ -3,7 +3,6 @@ package service
 import (
 	"athenabot/db"
 	"athenabot/util"
-	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"strconv"
@@ -13,12 +12,10 @@ import (
 
 type topConfig struct {
 	*BotConfig
-	ctx context.Context
 }
 
-func newTopConfig(ctx context.Context, botConfig *BotConfig) *topConfig {
+func newTopConfig(botConfig *BotConfig) *topConfig {
 	return &topConfig{
-		ctx:       ctx,
 		BotConfig: botConfig,
 	}
 }

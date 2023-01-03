@@ -4,7 +4,6 @@ import (
 	"athenabot/config"
 	"athenabot/db"
 	"athenabot/util"
-	"context"
 	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
@@ -13,7 +12,6 @@ import (
 
 type CommandConfig struct {
 	*BotConfig
-	ctx                          context.Context
 	command                      string
 	commandArg                   string
 	handleUserName               string
@@ -28,7 +26,7 @@ type CommandConfig struct {
 	canHandleNoAdminReply        bool
 }
 
-func NewCommandConfig(ctx context.Context, botConfig *BotConfig) (commandConfig *CommandConfig) {
+func NewCommandConfig(botConfig *BotConfig) (commandConfig *CommandConfig) {
 	commandFull := strings.FieldsFunc(botConfig.update.Message.Text, func(r rune) bool {
 		return r == '/' || r == ' ' || r == '@'
 	})
@@ -44,7 +42,6 @@ func NewCommandConfig(ctx context.Context, botConfig *BotConfig) (commandConfig 
 		}
 	}
 	commandConfig = &CommandConfig{
-		ctx:        ctx,
 		BotConfig:  botConfig,
 		command:    commandFull[0],
 		commandArg: arg,
@@ -62,10 +59,10 @@ func (c *CommandConfig) InCommands() {
 		c.commandMessageCleanCountdown = 300
 		defer func() {
 			if c.commandMessageCleanCountdown > 0 {
-				go c.autoDeleteMessage(c.commandMessageCleanCountdown, c.update.Message.MessageID)
+				go c.addDeleteMessageQueue(c.commandMessageCleanCountdown, c.update.Message.MessageID)
 			}
 			if c.botMessageID > 0 && c.botMessageCleanCountdown > 0 {
-				go c.autoDeleteMessage(c.botMessageCleanCountdown, c.botMessageID)
+				go c.addDeleteMessageQueue(c.botMessageCleanCountdown, c.botMessageID)
 			}
 		}()
 		if c.IsEnableChatService(c.command) {
@@ -248,5 +245,8 @@ func init() {
 	}
 	commandsFunc["doudoutop"] = func(c *CommandConfig) {
 		c.doudouTopCommand()
+	}
+	commandsFunc["clear_my_48h_message"] = func(c *CommandConfig) {
+		c.clearMy48hMessage()
 	}
 }

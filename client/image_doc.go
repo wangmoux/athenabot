@@ -26,10 +26,11 @@ func SearchImageDoc(client ImageDocClient, chatID int64, phrase string) ([]*mode
 	return imageDocs, nil
 }
 
-var ImageDocProvider = make(map[string]func(string) ImageDocClient)
-
-var docClient ImageDocClient
-var docClientOnce sync.Once
+var (
+	ImageDocProvider = make(map[string]func(string) ImageDocClient)
+	docClient        ImageDocClient
+	docClientOnce    sync.Once
+)
 
 const searchLimit = 10
 

@@ -13,12 +13,12 @@ import (
 )
 
 func (c *CommandConfig) marsTopCommand() {
-	t := newTopConfig(c.ctx, c.BotConfig)
+	t := newTopConfig(c.BotConfig)
 	t.getTop(marsTopKeyDir, "火星过", "次")
 }
 
 func (c *CommandConfig) studyTopCommand() {
-	t := newTopConfig(c.ctx, c.BotConfig)
+	t := newTopConfig(c.BotConfig)
 	t.getTop(studyTopKeyDir, "总课时", "分钟")
 }
 
@@ -75,7 +75,7 @@ func (c *CommandConfig) studyCommand() {
 		}}
 		c.messageConfig.Text = util.StrBuilder("好学生 ", c.handleUserName, " 恭喜获得学习时间", util.NumToStr(rtTime), "分钟")
 		c.sendMessage()
-		t := newTopConfig(c.ctx, c.BotConfig)
+		t := newTopConfig(c.BotConfig)
 		t.setTop(studyTopKeyDir, c.handleUserID, float64(rtTime))
 		c.commandLimitAdd(1)
 	} else {
@@ -499,7 +499,7 @@ func (c *CommandConfig) doudouCommand() {
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtMin), "分钟")
 		c.sendMessage()
 		c.commandLimitAdd(1)
-		t := newTopConfig(c.ctx, c.BotConfig)
+		t := newTopConfig(c.BotConfig)
 		t.setTop(doudouTopKeyDir, c.handleUserID, float64(1))
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
@@ -507,6 +507,74 @@ func (c *CommandConfig) doudouCommand() {
 }
 
 func (c *CommandConfig) doudouTopCommand() {
-	t := newTopConfig(c.ctx, c.BotConfig)
+	t := newTopConfig(c.BotConfig)
 	t.getTop(doudouTopKeyDir, "被斗过", "次")
+}
+
+func (c *CommandConfig) clearMy48hMessage() {
+	// c.commandMessageCleanCountdown = 5
+	c.canHandleSelf = true
+	c.canHandleAdmin = true
+	if !c.isApproveCommandRule() {
+		return
+	}
+	if c.handleUserID != c.update.Message.From.ID {
+		logrus.Warn("ignore: handle_user_id != from_id")
+		return
+	}
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+	logrus.Infof("handle_user:%v", c.handleUserID)
+	chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
+	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.update.Message.Chat.ID))
+	switch c.commandArg {
+	case "enable_cron":
+		err := db.RDB.SAdd(c.ctx, chat48hMessageDeleteCrontabKey, c.handleUserID).Err()
+		if err != nil {
+			logrus.Error(err)
+		}
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图计划已开启，你在本群的消息将会自动图图")
+		c.sendMessage()
+		return
+	case "disable_cron":
+		err := db.RDB.SRem(c.ctx, chat48hMessageDeleteCrontabKey, c.handleUserID).Err()
+		if err != nil {
+			logrus.Warn(err)
+		}
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图计划已禁用")
+		c.sendMessage()
+		return
+	}
+	messageIDs, err := db.RDB.HGetAll(c.ctx, chat48hMessageKey).Result()
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	for k, v := range messageIDs {
+		messageID, err := strconv.Atoi(k)
+		if err != nil {
+			continue
+		}
+		messageTime, err := strconv.Atoi(v)
+		if err != nil {
+			continue
+		}
+		if time.Now().Unix()-int64(messageTime) > 172800 {
+			continue
+		}
+		if messageID == c.update.Message.MessageID {
+			continue
+		}
+		c.addDeleteMessageQueue(0, messageID)
+	}
+	err = db.RDB.Del(c.ctx, chat48hMessageKey).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图中，如想完整图图请咨询管理员\nFBI WARNING 请勿随意模仿")
+	c.sendMessage()
 }

@@ -56,11 +56,13 @@ type Config struct {
 	MarsOCR          MarsOCR   `json:"mars_ocr"`
 }
 
-var Conf Config
-var PrivateCommandsMap = make(map[string]uint8)
-var CommandsMap = make(map[string]uint8)
-var WhitelistUsernameMap = make(map[string]int)
-var WhitelistIdMap = make(map[int64]int)
+var (
+	Conf                 Config
+	PrivateCommandsMap   = make(map[string]uint8)
+	CommandsMap          = make(map[string]uint8)
+	WhitelistUsernameMap = make(map[string]int)
+	WhitelistIdMap       = make(map[int64]int)
+)
 
 func init() {
 	config, err := ioutil.ReadFile(os.Getenv("BOT_CONFIG"))

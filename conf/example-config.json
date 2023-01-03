@@ -20,7 +20,8 @@
     "enable_member_verify": true,
     "enable_mars": true,
     "enable_command": true,
-    "enable_private_command": true
+    "enable_private_command": true,
+    "enable_chat_limit": true
   },
   "whitelist": {
     "groups_id": [
@@ -47,7 +48,7 @@
     "warn",
     "unwarn",
     "doudou",
-    "doudoutop",
+    "clear_my_48h_message",
     "chat_member_verify",
     "chat_limit",
     "chat_mars",

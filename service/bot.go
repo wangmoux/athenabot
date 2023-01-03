@@ -121,39 +121,52 @@ func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64) {
 	}
 }
 
-func (c *BotConfig) CleanDeleteMessage() {
-	logrus.Infof("new clean_delete_message:%v", c.update.Message.Chat.ID)
+func (c *BotConfig) DeleteMessageCronHandler() {
+	logrus.Infof("new delete_message_cron_handler:%v", c.update.Message.Chat.ID)
 	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
-	for {
-		time.Sleep(time.Second * 5)
+	ticker := time.NewTicker(time.Second * 5)
+	for range ticker.C {
 		res, err := db.RDB.HGetAll(context.Background(), deleteMessageKey).Result()
 		if err != nil {
 			logrus.Error(err)
 			continue
 		}
+		wg := new(sync.WaitGroup)
 		for k, v := range res {
-			deleteTime, _ := strconv.Atoi(v)
-			if int64(deleteTime) > time.Now().Unix() {
-				continue
-			}
-			messageID, _ := strconv.Atoi(k)
-			req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
-				ChatID:    c.update.Message.Chat.ID,
-				MessageID: messageID,
-			})
-			if !req.Ok {
-				logrus.Warnln(req.ErrorCode, err)
-			}
-			if err := db.RDB.HDel(context.Background(), deleteMessageKey, util.NumToStr(messageID)).Err(); err != nil {
-				logrus.Error(err)
-			}
+			time.Sleep(time.Millisecond * 10)
+			wg.Add(1)
+			go func(k, v string, wg *sync.WaitGroup) {
+				defer wg.Done()
+				deleteTime, err := strconv.Atoi(v)
+				if err != nil {
+					return
+				}
+				if int64(deleteTime) > time.Now().Unix() {
+					return
+				}
+				messageID, err := strconv.Atoi(k)
+				if err != nil {
+					return
+				}
+				req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
+					ChatID:    c.update.Message.Chat.ID,
+					MessageID: messageID,
+				})
+				if !req.Ok {
+					logrus.Warnln(req.ErrorCode, err)
+				}
+				if err := db.RDB.HDel(context.Background(), deleteMessageKey, util.NumToStr(messageID)).Err(); err != nil {
+					logrus.Error(err)
+				}
+			}(k, v, wg)
 		}
+		wg.Wait()
 	}
 }
 
-func (c *BotConfig) autoDeleteMessage(delay int, messageID int) {
+func (c *BotConfig) addDeleteMessageQueue(delay int, messageID int) {
 	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
-	if err := db.RDB.HMSet(c.ctx, deleteMessageKey, messageID, time.Now().Unix()+int64(delay)).Err(); err != nil {
+	if err := db.RDB.HMSet(context.Background(), deleteMessageKey, messageID, time.Now().Unix()+int64(delay)).Err(); err != nil {
 		logrus.Error(err)
 	}
 }

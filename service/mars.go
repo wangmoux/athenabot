@@ -7,7 +7,6 @@ import (
 	"athenabot/model"
 	"athenabot/util"
 	"bytes"
-	"context"
 	"encoding/json"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
@@ -22,17 +21,13 @@ type mars struct {
 
 type MarsConfig struct {
 	*BotConfig
-	ctx         context.Context
 	latestMars  mars
 	currentMars mars
 	marsID      string
 }
 
-func NewMarsConfig(ctx context.Context, botConfig *BotConfig) *MarsConfig {
-	return &MarsConfig{
-		ctx:       ctx,
-		BotConfig: botConfig,
-	}
+func NewMarsConfig(botConfig *BotConfig) *MarsConfig {
+	return &MarsConfig{BotConfig: botConfig}
 }
 
 func (c *MarsConfig) getMars() {
@@ -83,7 +78,7 @@ func (c *MarsConfig) handleMars() {
 	}
 	c.sendMessage()
 	logrus.Infof("mars_user:%v mars_id:%v", c.update.Message.From.ID, c.marsID)
-	t := newTopConfig(c.ctx, c.BotConfig)
+	t := newTopConfig(c.BotConfig)
 	t.setTop(marsTopKeyDir, c.update.Message.From.ID, 1)
 
 }

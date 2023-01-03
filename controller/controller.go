@@ -39,50 +39,59 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 		}()
 		if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") {
 			if len(update.Message.Photo) > 0 {
-				service.NewMarsConfig(ctx, c).HandlePhoto()
+				service.NewMarsConfig(c).HandlePhoto()
 				return
 			}
 			if update.Message.Video != nil {
-				service.NewMarsConfig(ctx, c).HandleVideo()
+				service.NewMarsConfig(c).HandleVideo()
 				return
 			}
 
 		}
 		if config.Conf.Modules.EnableCommand && update.Message.IsCommand() {
-			service.NewCommandConfig(ctx, c).InCommands()
+			service.NewCommandConfig(c).InCommands()
 			return
 		}
 
 		if config.Conf.Modules.EnableMemberVerify && c.IsEnableChatService("chat_member_verify") && len(update.Message.NewChatMembers) > 0 {
-			service.NewChatMemberConfig(ctx, c).NewChatMemberVerify()
+			service.NewChatConfig(c).NewChatMemberVerify()
 			return
 		}
 	}
 	if update.Message.Chat.Type == "private" {
 		if config.Conf.Modules.EnablePrivateCommand && update.Message.IsCommand() {
-			service.NewCommandConfig(ctx, c).InPrivateCommands()
+			service.NewCommandConfig(c).InPrivateCommands()
 			return
 
 		}
 	}
 }
 
-var asyncMap = make(map[int64]asyncChannel)
-
 type asyncChannel chan *service.BotConfig
 
-var deleteMessageOnce sync.Once
+var (
+	asyncMap             = make(map[int64]asyncChannel)
+	deleteMessageOnce    sync.Once
+	delete48hMessageOnce sync.Once
+)
 
 func asyncController(ch asyncChannel) {
 	for {
 		select {
 		case c := <-ch:
 			if config.Conf.Modules.EnableChatLimit && c.IsEnableChatService("chat_limit") {
-				service.NewChat(c).ChatLimit()
+				service.NewChatConfig(c).ChatLimit()
 			}
 			deleteMessageOnce.Do(func() {
-				go c.CleanDeleteMessage()
+				go c.DeleteMessageCronHandler()
 			})
+			if c.IsEnableChatService("clear_my_48h_message") {
+				cc := service.NewChatConfig(c)
+				cc.ChatStore48hMessage()
+				delete48hMessageOnce.Do(func() {
+					go cc.Delete48hMessageCronHandler()
+				})
+			}
 		}
 	}
 }

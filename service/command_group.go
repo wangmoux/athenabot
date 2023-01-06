@@ -28,7 +28,7 @@ func (c *CommandConfig) studyCommand() {
 		return
 	}
 
-	if c.isLimitCommand(2) {
+	if c.isLimitCommand(3) {
 		c.messageConfig.Text = "你学的太多了休息一下"
 		c.sendMessage()
 		return
@@ -445,7 +445,7 @@ func (c *CommandConfig) doudouCommand() {
 			return
 		}
 	}
-	if c.isLimitCommand(2) {
+	if c.isLimitCommand(3) {
 		rtTimestamp += 180
 		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tgbotapi.ChatMemberConfig{

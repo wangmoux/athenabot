@@ -87,13 +87,13 @@ func (c *CommandConfig) InPrivateCommands() {
 	}
 }
 
-func (c *CommandConfig) commandLimitAdd(addCount int) bool {
-	var count int
+func (c *CommandConfig) commandLimitAdd(addCount int) {
 	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {
 		logrus.Error(err)
 	}
+	var count int
 	if res > 0 {
 		resCount, err := db.RDB.Get(c.ctx, commandLimitKey).Result()
 		if err != nil {
@@ -107,15 +107,15 @@ func (c *CommandConfig) commandLimitAdd(addCount int) bool {
 	} else {
 		count = addCount
 	}
-	err = db.RDB.Set(c.ctx, commandLimitKey, count, 86400*time.Second).Err()
+	now := time.Now().UTC()
+	expiration := ((24 - now.Hour()) * 3600) - (now.Minute() * 60) - now.Second()
+	err = db.RDB.Set(c.ctx, commandLimitKey, count, time.Second*time.Duration(expiration)).Err()
 	if err != nil {
 		logrus.Error(err)
 	}
-	return false
 }
 
 func (c *CommandConfig) isLimitCommand(limit int) bool {
-	var count int
 	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {
@@ -126,7 +126,7 @@ func (c *CommandConfig) isLimitCommand(limit int) bool {
 		if err != nil {
 			logrus.Error(err)
 		}
-		count, err = strconv.Atoi(resCount)
+		count, err := strconv.Atoi(resCount)
 		if err != nil {
 			logrus.Error(err)
 		}

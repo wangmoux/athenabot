@@ -247,6 +247,9 @@ func init() {
 		c.doudouTopCommand()
 	}
 	commandsFunc["clear_my_48h_message"] = func(c *CommandConfig) {
-		c.clearMy48hMessage()
+		c.clearMy48hMessageCommand()
+	}
+	commandsFunc["honortop"] = func(c *CommandConfig) {
+		c.honorTopCommand()
 	}
 }

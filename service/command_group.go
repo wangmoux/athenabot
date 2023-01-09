@@ -511,7 +511,7 @@ func (c *CommandConfig) doudouTopCommand() {
 	t.getTop(doudouTopKeyDir, "被斗过", "次")
 }
 
-func (c *CommandConfig) clearMy48hMessage() {
+func (c *CommandConfig) clearMy48hMessageCommand() {
 	// c.commandMessageCleanCountdown = 5
 	c.canHandleSelf = true
 	c.canHandleAdmin = true
@@ -577,4 +577,10 @@ func (c *CommandConfig) clearMy48hMessage() {
 	}
 	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图中，如想完整图图请咨询管理员\nFBI WARNING 请勿随意模仿")
 	c.sendMessage()
+}
+
+func (c *CommandConfig) honorTopCommand() {
+	c.commandMessageCleanCountdown = 0
+	t := newTopConfig(c.BotConfig)
+	t.getTop(doudouTopKeyDir, "荣誉值", "升")
 }

@@ -580,7 +580,7 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 }
 
 func (c *CommandConfig) honorTopCommand() {
-	c.commandMessageCleanCountdown = 0
+	c.botMessageCleanCountdown = 0
 	t := newTopConfig(c.BotConfig)
 	t.getTop(doudouTopKeyDir, "荣誉值", "升")
 }

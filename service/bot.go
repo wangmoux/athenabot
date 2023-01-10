@@ -1,6 +1,7 @@
 package service
 
 import (
+	"athenabot/config"
 	"athenabot/db"
 	"athenabot/util"
 	"context"
@@ -66,7 +67,7 @@ func (c *BotConfig) sendMessage() {
 func (c *BotConfig) isAdmin(userID int64) bool {
 	logrus.Debugf("administrators:%v", util.LogMarshal(groupsAdministratorsCache))
 	if group, ok := groupsAdministratorsCache[c.update.Message.Chat.ID]; ok {
-		if _, ok := group[userID]; ok {
+		if _, _ok := group[userID]; _ok {
 			return true
 		}
 	} else {
@@ -84,13 +85,16 @@ func (c *BotConfig) isAdmin(userID int64) bool {
 		resJson := &simplejson.Json{}
 		resJson, _ = simplejson.NewJson(req.Result)
 		chatAdministrators := resJson.MustArray()
-		group := make(groupAdministratorsCache)
+		_group := make(groupAdministratorsCache)
 		for i := range chatAdministrators {
 			id := resJson.GetIndex(i).Get("user").Get("id").MustInt64()
-			group[id] = 0
+			_group[id] = 0
 		}
-		groupsAdministratorsCache[c.update.Message.Chat.ID] = group
-		if _, ok := group[userID]; ok {
+		for _, i := range config.Conf.SudoAdmins {
+			_group[i] = 0
+		}
+		groupsAdministratorsCache[c.update.Message.Chat.ID] = _group
+		if _, _ok := _group[userID]; _ok {
 			return true
 		}
 	}

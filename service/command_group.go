@@ -446,6 +446,43 @@ func (c *CommandConfig) doudouCommand() {
 		}
 	}
 	if c.isLimitCommand(3) {
+		if c.userIsAdmin {
+			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+				Type:   "text_mention",
+				Offset: 0,
+				Length: util.TGNameWidth(c.update.Message.From.FirstName),
+				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
+			}}
+			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 斗斗扩大化 检讨3分钟（实际不执行）")
+			c.sendMessage()
+		} else {
+			rtTimestamp += 180
+			req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
+				ChatMemberConfig: tgbotapi.ChatMemberConfig{
+					ChatID: c.update.Message.Chat.ID,
+					UserID: c.update.Message.From.ID,
+				},
+				UntilDate: rtTimestamp,
+			})
+			if req.Ok {
+				logrus.Infof("handle_user:%v rt_time:%v", c.update.Message.From.ID, 3)
+				c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+					Type:   "text_mention",
+					Offset: 0,
+					Length: util.TGNameWidth(c.update.Message.From.FirstName),
+					User:   &tgbotapi.User{ID: c.update.Message.From.ID},
+				}}
+				c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 斗斗扩大化 检讨3分钟")
+				c.sendMessage()
+			} else {
+				logrus.Errorln(req.ErrorCode, err)
+			}
+		}
+		return
+	}
+
+	doudouOdds, _ := rand.Int(rand.Reader, big.NewInt(2))
+	if doudouOdds.Int64() == 0 && !c.userIsAdmin {
 		rtTimestamp += 180
 		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tgbotapi.ChatMemberConfig{
@@ -462,18 +499,10 @@ func (c *CommandConfig) doudouCommand() {
 				Length: util.TGNameWidth(c.update.Message.From.FirstName),
 				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
 			}}
-			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 斗人不成被反斗", "3", "分钟")
+			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 诬陷群友 检讨3分钟")
 			c.sendMessage()
 		} else {
-			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-				Type:   "text_mention",
-				Offset: 0,
-				Length: util.TGNameWidth(c.update.Message.From.FirstName),
-				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
-			}}
-			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 这人有点厉害反弹不了")
-			c.sendMessage()
-			logrus.Warningln(req.ErrorCode, err)
+			logrus.Errorln(req.ErrorCode, err)
 		}
 		return
 	}

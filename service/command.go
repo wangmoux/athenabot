@@ -168,7 +168,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 		}
 		// c.canHandleSelf = true 允许处理自己的消息
 		if c.canHandleSelf && c.update.Message.From.ID == c.update.Message.ReplyToMessage.From.ID {
-			if c.userIsAdmin {
+			if c.userIsAdmin && !c.canHandleNoAdminReply {
 				c.messageConfig.Text = "搞不了！"
 				c.sendMessage()
 				return false

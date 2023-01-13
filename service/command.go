@@ -24,6 +24,7 @@ type CommandConfig struct {
 	canHandleSelf                bool
 	commandMessageCleanCountdown int
 	canHandleNoAdminReply        bool
+	canHandleAdminReply          bool
 }
 
 func NewCommandConfig(botConfig *BotConfig) (commandConfig *CommandConfig) {
@@ -160,7 +161,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 	}
 	if c.update.Message.ReplyToMessage != nil {
 		// 不能处理管理员的消息
-		if c.replyUserIsAdmin {
+		if c.replyUserIsAdmin && !c.canHandleAdminReply {
 			c.messageConfig.Text = "你太弱！"
 			c.sendMessage()
 			return false

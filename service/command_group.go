@@ -420,6 +420,7 @@ func (c *CommandConfig) doudouCommand() {
 	c.mustReply = true
 	c.canHandleSelf = true
 	c.canHandleNoAdminReply = true
+	c.canHandleAdminReply = true
 	if !c.isApproveCommandRule() {
 		return
 	}
@@ -445,7 +446,11 @@ func (c *CommandConfig) doudouCommand() {
 			return
 		}
 	}
-	if c.isLimitCommand(3) {
+	limit := 3
+	if c.userIsAdmin {
+		limit = 5
+	}
+	if c.isLimitCommand(limit) {
 		if c.userIsAdmin {
 			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 				Type:   "text_mention",
@@ -507,32 +512,43 @@ func (c *CommandConfig) doudouCommand() {
 		return
 	}
 
-	randTime, _ := rand.Int(rand.Reader, big.NewInt(3))
-	rtMin := randTime.Int64() + 1
-	rtTimestamp += rtMin * 60
-	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
-		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
-			UserID: c.handleUserID,
-		},
-		UntilDate: rtTimestamp,
-	})
-	if req.Ok {
-		logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtMin)
+	if c.replyUserIsAdmin {
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 			Type:   "text_mention",
 			Offset: 0,
 			Length: util.TGNameWidth(c.handleUserName),
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
-		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtMin), "分钟")
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 属于群内部矛盾 诫勉谈话一次")
 		c.sendMessage()
-		c.commandLimitAdd(1)
-		t := newTopConfig(c.BotConfig)
-		t.setTop(doudouTopKeyDir, c.handleUserID, float64(1))
 	} else {
-		logrus.Errorln(req.ErrorCode, err)
+		randTime, _ := rand.Int(rand.Reader, big.NewInt(3))
+		rtMin := randTime.Int64() + 1
+		rtTimestamp += rtMin * 60
+		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
+			ChatMemberConfig: tgbotapi.ChatMemberConfig{
+				ChatID: c.update.Message.Chat.ID,
+				UserID: c.handleUserID,
+			},
+			UntilDate: rtTimestamp,
+		})
+		if req.Ok {
+			logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtMin)
+			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+				Type:   "text_mention",
+				Offset: 0,
+				Length: util.TGNameWidth(c.handleUserName),
+				User:   &tgbotapi.User{ID: c.handleUserID},
+			}}
+			c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtMin), "分钟")
+			c.sendMessage()
+		} else {
+			logrus.Errorln(req.ErrorCode, err)
+		}
 	}
+	c.commandLimitAdd(1)
+	t := newTopConfig(c.BotConfig)
+	t.setTop(doudouTopKeyDir, c.handleUserID, float64(1))
 }
 
 func (c *CommandConfig) doudouTopCommand() {

@@ -10,7 +10,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -65,9 +64,17 @@ func (c *BotConfig) sendMessage() {
 }
 
 func (c *BotConfig) isAdmin(userID int64) bool {
-	logrus.Debugf("administrators:%v", util.LogMarshal(groupsAdministratorsCache))
-	if group, ok := groupsAdministratorsCache[c.update.Message.Chat.ID]; ok {
-		if _, _ok := group[userID]; _ok {
+	administratorsCacheKey := util.StrBuilder(administratorsCacheDir, util.NumToStr(c.update.Message.Chat.ID))
+	keyExists, err := db.RDB.Exists(c.ctx, administratorsCacheKey).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	if keyExists > 0 {
+		isAdministrator, err := db.RDB.SIsMember(c.ctx, administratorsCacheKey, userID).Result()
+		if err != nil {
+			logrus.Error(err)
+		}
+		if isAdministrator {
 			return true
 		}
 	} else {
@@ -85,44 +92,66 @@ func (c *BotConfig) isAdmin(userID int64) bool {
 		resJson := &simplejson.Json{}
 		resJson, _ = simplejson.NewJson(req.Result)
 		chatAdministrators := resJson.MustArray()
-		_group := make(groupAdministratorsCache)
+		chatAdministratorsMap := make(map[int64]uint8)
 		for i := range chatAdministrators {
 			id := resJson.GetIndex(i).Get("user").Get("id").MustInt64()
-			_group[id] = 0
+			chatAdministratorsMap[id] = 0
 		}
-		for _, i := range config.Conf.SudoAdmins {
-			_group[i] = 0
+		for _, id := range config.Conf.SudoAdmins {
+			chatAdministratorsMap[id] = 0
 		}
-		groupsAdministratorsCache[c.update.Message.Chat.ID] = _group
-		if _, _ok := _group[userID]; _ok {
+		for id := range chatAdministratorsMap {
+			err := db.RDB.SAdd(c.ctx, administratorsCacheKey, id).Err()
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+		err = db.RDB.Expire(c.ctx, administratorsCacheKey, time.Second*86400).Err()
+		if err != nil {
+			logrus.Error(err)
+		}
+		if _, _ok := chatAdministratorsMap[userID]; _ok {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64) {
+func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64, cache *userNameCache) {
 	defer wg.Done()
-	if _, ok := userNameCache[userID]; !ok {
+	userNameCacheKey := util.StrBuilder(userNameCacheDir, util.NumToStr(userID))
+	keyExists, err := db.RDB.Exists(c.ctx, userNameCacheKey).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	var userName string
+	if keyExists > 0 {
+		userName, err = db.RDB.Get(c.ctx, userNameCacheKey).Result()
+		if err != nil {
+			logrus.Error(err)
+		}
+	} else {
 		req, err := c.bot.Request(tgbotapi.GetChatMemberConfig{
 			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
 				ChatID: c.update.Message.Chat.ID,
 				UserID: userID,
 			},
 		})
-		if !req.Ok {
-			logrus.Errorln(req.ErrorCode, err)
-			if strings.Contains(req.Description, "user not found") {
-				unknownUserCache[userID] = 0
+		if req.Ok {
+			userJson := &simplejson.Json{}
+			userJson, _ = simplejson.NewJson(req.Result)
+			userName = userJson.Get("user").Get("first_name").MustString()
+			if len(userName) > 0 {
+				err = db.RDB.Set(c.ctx, userNameCacheKey, userName, time.Second*86400).Err()
+				if err != nil {
+					logrus.Error(err)
+				}
 			}
-			return
+		} else {
+			logrus.Errorln(req.ErrorCode, err)
 		}
-		userJson := &simplejson.Json{}
-		userJson, _ = simplejson.NewJson(req.Result)
-		defer userNameCacheLock.Unlock()
-		userNameCacheLock.Lock()
-		userNameCache[userID] = userJson.Get("user").Get("first_name").MustString()
 	}
+	cache.userName[userID] = userName
 }
 
 func (c *BotConfig) DeleteMessageCronHandler() {

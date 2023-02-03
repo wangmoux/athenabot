@@ -56,12 +56,13 @@ func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
 	if err != nil {
 		logrus.Error(err)
 	}
+	userNames := &userNameCache{userName: make(map[int64]string)}
 	func() {
 		wg := new(sync.WaitGroup)
 		for _, userId := range resTopUser {
 			id, _ := strconv.ParseInt(userId, 10, 64)
 			wg.Add(1)
-			go c.getUserNameCache(wg, id)
+			go c.getUserNameCache(wg, id, userNames)
 		}
 		wg.Wait()
 	}()
@@ -71,17 +72,13 @@ func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
 		if err != nil {
 			logrus.Error(err)
 		}
-		var firstName string
-		if v, ok := userNameCache[id]; ok {
-			firstName = v
-		} else {
-			firstName = "无名氏"
-			if _, ok := unknownUserCache[id]; ok {
-				err := db.RDB.ZRem(c.ctx, topText, id).Err()
-				if err != nil {
-					logrus.Error(err)
-				}
+		firstName, _ := userNames.userName[id]
+		if len(firstName) == 0 {
+			err := db.RDB.ZRem(c.ctx, key, id).Err()
+			if err != nil {
+				logrus.Error(err)
 			}
+			continue
 		}
 		topText += util.StrBuilder(firstName, " ", topPrefix, util.NumToStr(score), topSuffix, "\n")
 	}

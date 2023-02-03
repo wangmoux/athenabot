@@ -78,7 +78,7 @@ func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
 			if err != nil {
 				logrus.Error(err)
 			}
-			continue
+			firstName = "无名"
 		}
 		topText += util.StrBuilder(firstName, " ", topPrefix, util.NumToStr(score), topSuffix, "\n")
 	}

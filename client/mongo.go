@@ -41,8 +41,13 @@ func (m *MongoClient) addImageDoc(doc *model.ImageDoc) error {
 
 func (m *MongoClient) searchImageDoc(chatID int64, phrase string) ([]*model.ImageDoc, error) {
 	m.set()
-	coll := m.Client.Database(m.name).Collection(m.name)
 	var imageDocs []*model.ImageDoc
+	defer func() {
+		for _, i := range imageDocs {
+			model.ImageDocPool.Put(i)
+		}
+	}()
+	coll := m.Client.Database(m.name).Collection(m.name)
 	filter := bson.D{{"chat_id", chatID},
 		{"$text", bson.D{{"$search", util.StrBuilder("\"", phrase, "\"")}}}}
 	cursor, err := coll.Find(context.Background(), filter, options.Find().SetLimit(searchLimit))
@@ -51,7 +56,6 @@ func (m *MongoClient) searchImageDoc(chatID int64, phrase string) ([]*model.Imag
 	}
 	for cursor.Next(context.Background()) {
 		imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
-		model.ImageDocPool.Put(imageDoc)
 		err = cursor.Decode(imageDoc)
 		if err != nil {
 			logrus.Error(err)

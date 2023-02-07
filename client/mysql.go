@@ -42,12 +42,17 @@ func (m *MysqlClient) addImageDoc(doc *model.ImageDoc) error {
 
 func (m *MysqlClient) searchImageDoc(chatID int64, phrase string) ([]*model.ImageDoc, error) {
 	var _imageDocs []model.MysqlImageDoc
+	var imageDocs []*model.ImageDoc
+	defer func() {
+		for _, i := range imageDocs {
+			model.ImageDocPool.Put(i)
+		}
+	}()
 	sql := util.StrBuilder("MATCH (image_phrases) AGAINST (", "'\"", phrase, "\"'", " IN BOOLEAN MODE) AND chat_id = ?")
 	err := m.Limit(searchLimit).Where(sql, chatID).Find(&_imageDocs).Error
 	if err != nil {
-		return nil, err
+		return imageDocs, err
 	}
-	var imageDocs []*model.ImageDoc
 	for _, item := range _imageDocs {
 		t, _ := time.Parse("2006-01-02 15:04:05", item.CreateTime)
 		imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
@@ -56,7 +61,6 @@ func (m *MysqlClient) searchImageDoc(chatID int64, phrase string) ([]*model.Imag
 		imageDoc.ChatID = item.ChatID
 		imageDoc.CreateTime = t
 		imageDocs = append(imageDocs, imageDoc)
-		model.ImageDocPool.Put(imageDoc)
 	}
 	return imageDocs, nil
 }

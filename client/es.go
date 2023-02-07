@@ -35,17 +35,21 @@ func (e *EsClient) addImageDoc(imageDoc *model.ImageDoc) error {
 
 func (e *EsClient) searchImageDoc(chatID int64, phrase string) ([]*model.ImageDoc, error) {
 	e.set()
+	var imageDocs []*model.ImageDoc
+	defer func() {
+		for _, i := range imageDocs {
+			model.ImageDocPool.Put(i)
+		}
+	}()
 	boolQuery := elastic.NewBoolQuery().Must(
 		elastic.NewTermQuery("chat_id", chatID),
 		elastic.NewMatchQuery("image_phrases", phrase))
 	res, err := e.Search(e.name).Query(boolQuery).Size(searchLimit).Do(context.Background())
 	if err != nil {
-		return nil, err
+		return imageDocs, err
 	}
-	var imageDocs []*model.ImageDoc
 	for _, item := range res.Hits.Hits {
 		imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
-		model.ImageDocPool.Put(imageDoc)
 		_ = json.Unmarshal(item.Source, imageDoc)
 		imageDocs = append(imageDocs, imageDoc)
 

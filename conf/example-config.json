@@ -17,11 +17,9 @@
     "token": ""
   },
   "modules": {
-    "enable_member_verify": true,
     "enable_mars": true,
     "enable_command": true,
-    "enable_private_command": true,
-    "enable_chat_limit": true
+    "enable_private_command": true
   },
   "whitelist": {
     "groups_id": [
@@ -54,7 +52,8 @@
     "chat_member_verify",
     "chat_limit",
     "chat_mars",
-    "chat_mars_ocr"
+    "chat_mars_ocr",
+    "chat_userprofile_watch"
   ],
   "private_commands": [
     "start"

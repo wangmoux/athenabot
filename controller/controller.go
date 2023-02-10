@@ -52,11 +52,6 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 			service.NewCommandConfig(c).InCommands()
 			return
 		}
-
-		if config.Conf.Modules.EnableMemberVerify && c.IsEnableChatService("chat_member_verify") && len(update.Message.NewChatMembers) > 0 {
-			service.NewChatConfig(c).NewChatMemberVerify()
-			return
-		}
 	}
 	if update.Message.Chat.Type == "private" {
 		if config.Conf.Modules.EnablePrivateCommand && update.Message.IsCommand() {
@@ -70,27 +65,29 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 type asyncChannel chan *service.BotConfig
 
 var (
-	asyncMap             = make(map[int64]asyncChannel)
-	deleteMessageOnce    sync.Once
-	delete48hMessageOnce sync.Once
+	asyncMap            = make(map[int64]asyncChannel)
+	asyncControllerOnce sync.Once
 )
 
 func asyncController(ch asyncChannel) {
 	for {
 		select {
 		case c := <-ch:
-			if config.Conf.Modules.EnableChatLimit && c.IsEnableChatService("chat_limit") {
-				service.NewChatConfig(c).ChatLimit()
-			}
-			deleteMessageOnce.Do(func() {
+			cc := service.NewChatConfig(c)
+			asyncControllerOnce.Do(func() {
 				go c.DeleteMessageCronHandler()
-			})
-			if c.IsEnableChatService("clear_my_48h_message") {
-				cc := service.NewChatConfig(c)
-				cc.ChatStore48hMessage()
-				delete48hMessageOnce.Do(func() {
+				if c.IsEnableChatService("clear_my_48h_message") {
 					go cc.Delete48hMessageCronHandler()
-				})
+				}
+			})
+			if c.IsEnableChatService("chat_member_verify") {
+				cc.NewChatMemberVerify()
+			}
+			if c.IsEnableChatService("chat_limit") {
+				cc.ChatLimit()
+			}
+			if c.IsEnableChatService("chat_userprofile_watch") {
+				cc.ChatUserprofileWatch()
 			}
 		}
 	}

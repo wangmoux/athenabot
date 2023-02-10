@@ -1,9 +1,11 @@
 package service
 
 import (
+	"athenabot/config"
 	"athenabot/db"
 	"athenabot/util"
 	"context"
+	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
@@ -103,4 +105,56 @@ func (c *ChatConfig) Delete48hMessageCronHandler() {
 			}
 		}
 	}
+}
+
+func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string) {
+	keyExists, err := db.RDB.Exists(c.ctx, key).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	if keyExists > 0 {
+		latestName, err := db.RDB.ZRevRange(c.ctx, key, 0, 0).Result()
+		if err != nil {
+			logrus.Error(err)
+		}
+		if latestName[0] != currentName {
+			c.messageConfig.Text = util.StrBuilder(prefix, " ", latestName[0], " -> ", currentName)
+			c.sendMessage()
+			err = db.RDB.ZAdd(c.ctx, key, &redis.Z{
+				Score:  float64(time.Now().Unix()),
+				Member: currentName,
+			}).Err()
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+	} else {
+		err = db.RDB.ZAdd(c.ctx, key, &redis.Z{
+			Score:  float64(time.Now().Unix()),
+			Member: currentName,
+		}).Err()
+		if err != nil {
+			logrus.Error(err)
+		}
+	}
+
+	err = db.RDB.Expire(c.ctx, key, time.Second*time.Duration(config.Conf.KeyTTL)).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+}
+
+func (c *ChatConfig) ChatUserprofileWatch() {
+	usernameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.update.Message.Chat.ID), ":",
+		util.NumToStr(c.update.Message.From.ID), ":", "username")
+	currentUsername := c.update.Message.From.UserName
+	if len(currentUsername) == 0 {
+		currentUsername = "unknown"
+	}
+	c.chatUserprofileWatchHandler(usernameKey, currentUsername, "用户名已更改")
+
+	fullNameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.update.Message.Chat.ID), ":",
+		util.NumToStr(c.update.Message.From.ID), ":", "full_name")
+	currentFullName := c.update.Message.From.FirstName + c.update.Message.From.LastName
+	c.chatUserprofileWatchHandler(fullNameKey, currentFullName, "昵称已更改")
 }

@@ -14,6 +14,7 @@ const (
 	chat48hMessageDeleteCrontabDir = "bot:chat_48h_message_delete_crontab:"
 	userNameCacheDir               = "bot:user_name_cache:"
 	administratorsCacheDir         = "bot:administrators_cache:"
+	chatUserprofileWatchDir        = "bot:chat_userprofile_watch:"
 )
 
 var (

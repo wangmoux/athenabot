@@ -83,11 +83,14 @@ func asyncController(ch asyncChannel) {
 			if c.IsEnableChatService("chat_member_verify") {
 				cc.NewChatMemberVerify()
 			}
-			if c.IsEnableChatService("chat_limit") {
-				cc.ChatLimit()
+			if c.IsEnableChatService("clear_my_48h_message") {
+				cc.ChatStore48hMessage()
 			}
 			if c.IsEnableChatService("chat_userprofile_watch") {
 				cc.ChatUserprofileWatch()
+			}
+			if c.IsEnableChatService("chat_limit") {
+				cc.ChatLimit()
 			}
 			if c.IsEnableChatService("chat_blacklist") {
 				cc.ChatBlacklistHandler()

@@ -8,7 +8,9 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 )
 
 type ChatConfig struct {
@@ -157,4 +159,29 @@ func (c *ChatConfig) ChatUserprofileWatch() {
 		util.NumToStr(c.update.Message.From.ID), ":", "full_name")
 	currentFullName := c.update.Message.From.FirstName + c.update.Message.From.LastName
 	c.chatUserprofileWatchHandler(fullNameKey, currentFullName, "昵称已更改")
+}
+
+func (c *ChatConfig) ChatBlacklistHandler() {
+	if c.update.Message.IsCommand() && c.isAdmin(c.update.Message.From.ID) {
+		return
+	}
+	key := util.StrBuilder(chatBlacklistDir, util.NumToStr(c.update.Message.Chat.ID))
+	keywords, err := db.RDB.ZRevRange(context.Background(), key, 0, -1).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	var text string
+	for _, i := range c.update.Message.Text {
+		if unicode.IsSpace(i) || unicode.IsPunct(i) {
+			continue
+		}
+		text += string(i)
+	}
+	for _, keyword := range keywords {
+		if strings.Contains(text, keyword) {
+			c.messageConfig.Text = "你的发言涉嫌违反群规"
+			c.sendMessage()
+			break
+		}
+	}
 }

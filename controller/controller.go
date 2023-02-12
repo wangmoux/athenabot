@@ -89,6 +89,9 @@ func asyncController(ch asyncChannel) {
 			if c.IsEnableChatService("chat_userprofile_watch") {
 				cc.ChatUserprofileWatch()
 			}
+			if c.IsEnableChatService("chat_blacklist") {
+				cc.ChatBlacklistHandler()
+			}
 		}
 	}
 }

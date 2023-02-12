@@ -15,6 +15,7 @@ const (
 	userNameCacheDir               = "bot:user_name_cache:"
 	administratorsCacheDir         = "bot:administrators_cache:"
 	chatUserprofileWatchDir        = "bot:chat_userprofile_watch:"
+	chatBlacklistDir               = "bot:chat_blacklist:"
 )
 
 var (

@@ -53,7 +53,8 @@
     "chat_limit",
     "chat_mars",
     "chat_mars_ocr",
-    "chat_userprofile_watch"
+    "chat_userprofile_watch",
+    "chat_blacklist"
   ],
   "private_commands": [
     "start"

@@ -253,4 +253,7 @@ func init() {
 	commandsFunc["honortop"] = func(c *CommandConfig) {
 		c.honorTopCommand()
 	}
+	commandsFunc["chat_blacklist"] = func(c *CommandConfig) {
+		c.chatBlacklistCommand()
+	}
 }

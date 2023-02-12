@@ -5,6 +5,7 @@ import (
 	"athenabot/db"
 	"athenabot/util"
 	"crypto/rand"
+	"github.com/go-redis/redis/v8"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"math/big"
@@ -628,4 +629,48 @@ func (c *CommandConfig) honorTopCommand() {
 	c.botMessageCleanCountdown = 0
 	t := newTopConfig(c.BotConfig)
 	t.getTop(doudouTopKeyDir, "荣誉值", "升")
+}
+
+func (c *CommandConfig) chatBlacklistCommand() {
+	key := util.StrBuilder(chatBlacklistDir, util.NumToStr(c.update.Message.Chat.ID))
+	if len(c.commandArg) == 0 {
+		keywords, err := db.RDB.ZRevRange(c.ctx, key, 0, -1).Result()
+		if err != nil {
+			logrus.Error(err)
+		}
+		var text string
+		for _, keyword := range keywords {
+			text += util.StrBuilder(keyword, "\n")
+		}
+		c.messageConfig.Text = text
+		c.sendMessage()
+	}
+	if len(c.commandArg) > 2 {
+		c.mustAdmin = true
+		c.canHandleAdmin = true
+		if !c.isApproveCommandRule() {
+			return
+		}
+		if c.commandArg[:2] == "-a" {
+			card, _ := db.RDB.ZCard(c.ctx, key).Result()
+			if card >= 100 {
+				c.messageConfig.Text = "黑名单不能超过100个"
+				c.sendMessage()
+				return
+			}
+			err := db.RDB.ZAdd(c.ctx, key, &redis.Z{
+				Score:  float64(time.Now().Unix()),
+				Member: c.commandArg[2:],
+			}).Err()
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+		if c.commandArg[:2] == "-d" {
+			err := db.RDB.ZRem(c.ctx, key, c.commandArg[2:]).Err()
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+	}
 }

@@ -180,7 +180,7 @@ func (c *CommandConfig) rtCommand() {
 	var rtTime int64
 	arg, err := strconv.Atoi(c.commandArg)
 	if err == nil {
-		rtTime = int64(uint8(arg))
+		rtTime = int64(arg)
 	} else {
 		rtTime = 500000
 	}

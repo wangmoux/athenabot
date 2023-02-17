@@ -159,6 +159,7 @@ func (c *CommandConfig) unBanCommand() {
 			ChatID: c.update.Message.Chat.ID,
 			UserID: c.handleUserID,
 		},
+		OnlyIfBanned: true,
 	})
 	if req.Ok {
 		logrus.Infof("handle_user:%v", c.handleUserID)

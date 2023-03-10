@@ -66,12 +66,20 @@ var (
 )
 
 func init() {
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableColors:   true,
+		TimestampFormat: "2006-01-02 15:04:05",
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+			fileName := path.Base(frame.File)
+			return frame.Function, fileName
+		},
+	})
 	config, err := ioutil.ReadFile(os.Getenv("BOT_CONFIG"))
 	if err != nil {
-		panic(err)
+		logrus.Fatalln(err)
 	}
 	if err := json.Unmarshal(config, &Conf); err != nil {
-		panic(err)
+		logrus.Fatalln(err)
 	}
 
 	for _, i := range Conf.Commands {
@@ -89,6 +97,7 @@ func init() {
 
 	switch {
 	case Conf.LogLevel >= 3:
+		logrus.SetReportCaller(true)
 		logrus.SetLevel(logrus.DebugLevel)
 	case Conf.LogLevel == 2:
 		logrus.SetLevel(logrus.InfoLevel)
@@ -97,14 +106,6 @@ func init() {
 	default:
 		logrus.SetLevel(logrus.ErrorLevel)
 	}
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: "2006-01-02 15:04:05",
-		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
-			fileName := path.Base(frame.File)
-			return frame.Function, fileName
-		},
-	})
 
 	logrus.Infof("config:%v", util.LogMarshal(Conf))
 }

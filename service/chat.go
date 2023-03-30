@@ -28,6 +28,9 @@ type chatLimit struct {
 }
 
 func (c *ChatConfig) ChatLimit() {
+	if len(c.update.Message.Text) == 0 {
+		return
+	}
 	timestamp := time.Now().Unix()
 	if group, ok := groupsChatLimit[c.update.Message.Chat.ID]; ok {
 		if group.userID == c.update.Message.From.ID {

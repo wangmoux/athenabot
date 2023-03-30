@@ -125,6 +125,21 @@ func (c *CommandConfig) dbanCommand() {
 		},
 		RevokeMessages: true,
 	})
+	if c.IsEnableChatService("clear_my_48h_message") {
+		chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
+		messageIDs, err := db.RDB.HGetAll(c.ctx, chat48hMessageKey).Result()
+		if err != nil {
+			logrus.Error(err)
+			return
+		}
+		for k := range messageIDs {
+			messageID, err := strconv.Atoi(k)
+			if err != nil {
+				continue
+			}
+			c.addDeleteMessageQueue(0, messageID)
+		}
+	}
 	if req.Ok {
 		logrus.Infof("handle_user:%v", c.handleUserID)
 		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
@@ -488,8 +503,8 @@ func (c *CommandConfig) doudouCommand() {
 		return
 	}
 
-	doudouOdds, _ := rand.Int(rand.Reader, big.NewInt(2))
-	if doudouOdds.Int64() == 0 && !c.userIsAdmin {
+	doudouOdds, _ := rand.Int(rand.Reader, big.NewInt(99))
+	if doudouOdds.Int64() < 5 && !c.userIsAdmin {
 		rtTimestamp += 180
 		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tgbotapi.ChatMemberConfig{
@@ -575,6 +590,13 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 		Length: util.TGNameWidth(c.handleUserName),
 		User:   &tgbotapi.User{ID: c.handleUserID},
 	}}
+
+	if c.isLimitCommand(1) {
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 本来无一物 何处惹尘埃")
+		c.sendMessage()
+		return
+	}
+
 	logrus.Infof("handle_user:%v", c.handleUserID)
 	chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
 	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.update.Message.Chat.ID))
@@ -624,6 +646,7 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 	}
 	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图中，如想完整图图请咨询管理员\nFBI WARNING 请勿随意模仿")
 	c.sendMessage()
+	c.commandLimitAdd(1)
 }
 
 func (c *CommandConfig) honorTopCommand() {

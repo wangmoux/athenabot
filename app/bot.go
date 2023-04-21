@@ -28,6 +28,9 @@ func RunBot() {
 
 func updatesHandler(client Client) {
 	for update := range client.Channel() {
+		if update.CallbackQuery != nil {
+			update.Message = update.CallbackQuery.Message
+		}
 		if update.Message != nil {
 			if chatCh, ok := chatMap[update.Message.Chat.ID]; ok {
 				chatCh <- update

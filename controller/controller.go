@@ -25,39 +25,56 @@ func isInWhitelist(ChatUserName string, chatID int64) bool {
 func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	logrus.DebugFn(util.LogMarshalFn(update))
 	c := service.NewBotConfig(ctx, cancel, bot, update)
-	if config.Conf.DisableWhitelist || isInWhitelist(update.Message.Chat.UserName, update.Message.Chat.ID) {
-		func() {
-			if ch, ok := asyncMap[update.Message.Chat.ID]; ok {
-				ch <- c
-				return
-			}
-			logrus.Infof("new async_controller:%v", update.Message.Chat.ID)
-			ch := make(asyncChannel, 10)
-			asyncMap[update.Message.Chat.ID] = ch
-			go asyncController(ch)
-			ch <- c
-		}()
-		if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") {
-			if len(update.Message.Photo) > 0 {
-				service.NewMarsConfig(c).HandlePhoto()
-				return
-			}
-			if update.Message.Video != nil {
-				service.NewMarsConfig(c).HandleVideo()
-				return
-			}
-
-		}
-		if config.Conf.Modules.EnableCommand && update.Message.IsCommand() {
-			service.NewCommandConfig(c).InCommands()
+	if update.CallbackQuery != nil {
+		callbackData, err := service.ParseCallbackData(update.CallbackQuery.Data)
+		if err != nil {
 			return
 		}
+		logrus.Infof("callback:%+v", callbackData)
+		cb := service.NewCallBack(c, callbackData)
+		switch callbackData.Command {
+		case "clear":
+			cb.ClearMy48hMessage()
+		}
+		return
 	}
-	if update.Message.Chat.Type == "private" {
-		if config.Conf.Modules.EnablePrivateCommand && update.Message.IsCommand() {
-			service.NewCommandConfig(c).InPrivateCommands()
-			return
 
+	if update.Message != nil {
+		switch update.Message.Chat.Type {
+		case "supergroup", "group":
+			if config.Conf.DisableWhitelist || isInWhitelist(update.Message.Chat.UserName, update.Message.Chat.ID) {
+				func() {
+					if ch, ok := asyncMap[update.Message.Chat.ID]; ok {
+						ch <- c
+						return
+					}
+					logrus.Infof("new async_controller:%v", update.Message.Chat.ID)
+					ch := make(asyncChannel, 10)
+					asyncMap[update.Message.Chat.ID] = ch
+					go asyncController(ch)
+					ch <- c
+				}()
+				if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") {
+					if len(update.Message.Photo) > 0 {
+						service.NewMarsConfig(c).HandlePhoto()
+						return
+					}
+					if update.Message.Video != nil {
+						service.NewMarsConfig(c).HandleVideo()
+						return
+					}
+
+				}
+				if config.Conf.Modules.EnableCommand && update.Message.IsCommand() {
+					service.NewCommandConfig(c).InCommands()
+					return
+				}
+			}
+		case "private":
+			if config.Conf.Modules.EnablePrivateCommand && update.Message.IsCommand() {
+				service.NewCommandConfig(c).InPrivateCommands()
+				return
+			}
 		}
 	}
 }

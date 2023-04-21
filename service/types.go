@@ -26,3 +26,9 @@ var (
 type userNameCache struct {
 	userName map[int64]string
 }
+
+type CallbackData struct {
+	Command   string `json:"command"`
+	UserID    int64  `json:"user_id"`
+	MessageID int    `json:"message_id"`
+}

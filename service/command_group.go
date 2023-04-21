@@ -591,14 +591,13 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 		User:   &tgbotapi.User{ID: c.handleUserID},
 	}}
 
-	if c.isLimitCommand(1) {
+	if c.isLimitCommand(2) {
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 本来无一物 何处惹尘埃")
 		c.sendMessage()
 		return
 	}
 
 	logrus.Infof("handle_user:%v", c.handleUserID)
-	chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
 	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.update.Message.Chat.ID))
 	switch c.commandArg {
 	case "enable_cron":
@@ -617,36 +616,17 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图计划已禁用")
 		c.sendMessage()
 		return
+	default:
+		c.commandLimitAdd(1)
+		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图中，如想完整图图请咨询管理员\nFBI WARNING 请勿随意模仿")
+		callbackData := GenerateCallbackData("clear", c.handleUserID, c.update.Message.MessageID)
+		confirmButton := tgbotapi.NewInlineKeyboardButtonData("确定图图？", callbackData)
+		replyMarkup := tgbotapi.NewInlineKeyboardMarkup(
+			[]tgbotapi.InlineKeyboardButton{confirmButton},
+		)
+		c.messageConfig.ReplyMarkup = replyMarkup
+		c.sendMessage()
 	}
-	messageIDs, err := db.RDB.HGetAll(c.ctx, chat48hMessageKey).Result()
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-	for k, v := range messageIDs {
-		messageID, err := strconv.Atoi(k)
-		if err != nil {
-			continue
-		}
-		messageTime, err := strconv.Atoi(v)
-		if err != nil {
-			continue
-		}
-		if time.Now().Unix()-int64(messageTime) > 172800 {
-			continue
-		}
-		if messageID == c.update.Message.MessageID {
-			continue
-		}
-		c.addDeleteMessageQueue(0, messageID)
-	}
-	err = db.RDB.Del(c.ctx, chat48hMessageKey).Err()
-	if err != nil {
-		logrus.Error(err)
-	}
-	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图中，如想完整图图请咨询管理员\nFBI WARNING 请勿随意模仿")
-	c.sendMessage()
-	c.commandLimitAdd(1)
 }
 
 func (c *CommandConfig) honorTopCommand() {

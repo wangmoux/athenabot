@@ -3,6 +3,7 @@ package service
 import (
 	"athenabot/db"
 	"athenabot/util"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
@@ -42,7 +43,7 @@ func (c *CallBack) ClearMy48hMessage() {
 		if time.Now().Unix()-int64(messageTime) > 172800 {
 			continue
 		}
-		if messageID == c.callbackData.MessageID {
+		if messageID == c.callbackData.MsgID {
 			continue
 		}
 		c.addDeleteMessageQueue(0, messageID)
@@ -50,5 +51,30 @@ func (c *CallBack) ClearMy48hMessage() {
 	err = db.RDB.Del(c.ctx, chat48hMessageKey).Err()
 	if err != nil {
 		logrus.Error(err)
+	}
+}
+
+func (c *CallBack) ClearInactivityUsers() {
+	if !c.isAdmin(c.update.CallbackQuery.From.ID) {
+		return
+	}
+	chatUserActivityData, err := c.generateUserActivityData()
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+
+	for _, data := range chatUserActivityData {
+		if data.inactiveDays >= c.callbackData.MsgID {
+			res, err := c.bot.Request(tgbotapi.BanChatMemberConfig{
+				ChatMemberConfig: tgbotapi.ChatMemberConfig{
+					ChatID: c.update.Message.Chat.ID,
+					UserID: data.userID,
+				},
+			})
+			if !res.Ok {
+				logrus.Errorln(res, err)
+			}
+		}
 	}
 }

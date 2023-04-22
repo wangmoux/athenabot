@@ -619,7 +619,7 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 	default:
 		c.commandLimitAdd(1)
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图中，如想完整图图请咨询管理员\nFBI WARNING 请勿随意模仿")
-		callbackData := GenerateCallbackData("clear", c.handleUserID, c.update.Message.MessageID)
+		callbackData := GenerateCallbackData("clear-msg", c.handleUserID, c.update.Message.MessageID)
 		confirmButton := tgbotapi.NewInlineKeyboardButtonData("确定图图？", callbackData)
 		replyMarkup := tgbotapi.NewInlineKeyboardMarkup(
 			[]tgbotapi.InlineKeyboardButton{confirmButton},
@@ -677,4 +677,50 @@ func (c *CommandConfig) chatBlacklistCommand() {
 			}
 		}
 	}
+}
+
+func (c *CommandConfig) chatUserActivityCommand() {
+	c.mustAdmin = true
+	c.canHandleAdmin = true
+	if !c.isApproveCommandRule() {
+		return
+	}
+
+	if len(c.commandArg) > 0 {
+		if c.isLimitCommand(1) {
+			return
+		}
+
+		day, err := strconv.Atoi(c.commandArg)
+		if err != nil {
+			return
+		}
+		if day < 90 {
+			day = 90
+		}
+		callbackData := GenerateCallbackData("clear-iu", c.handleUserID, day)
+		confirmButton := tgbotapi.NewInlineKeyboardButtonData("确定图图？", callbackData)
+		replyMarkup := tgbotapi.NewInlineKeyboardMarkup(
+			[]tgbotapi.InlineKeyboardButton{confirmButton},
+		)
+		c.messageConfig.ReplyMarkup = replyMarkup
+		c.messageConfig.Text = util.StrBuilder(util.NumToStr(day), " 天不活跃群友将会被图图\n")
+		c.sendMessage()
+		c.commandLimitAdd(5)
+		return
+	}
+
+	chatUserActivityData, err := c.generateUserActivityData()
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+
+	var msg string
+	for _, data := range chatUserActivityData {
+		msg += util.StrBuilder(data.fullName, " ", util.NumToStr(data.inactiveDays), "天 未活跃\n")
+	}
+
+	c.messageConfig.Text = msg
+	c.sendMessage()
 }

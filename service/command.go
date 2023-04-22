@@ -256,4 +256,7 @@ func init() {
 	commandsFunc["chat_blacklist"] = func(c *CommandConfig) {
 		c.chatBlacklistCommand()
 	}
+	commandsFunc["chat_user_activity"] = func(c *CommandConfig) {
+		c.chatUserActivityCommand()
+	}
 }

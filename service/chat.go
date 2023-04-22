@@ -188,3 +188,15 @@ func (c *ChatConfig) ChatBlacklistHandler() {
 		}
 	}
 }
+
+func (c *ChatConfig) ChatUserActivity() {
+	key := util.StrBuilder(chatUserActivityDir, util.NumToStr(c.update.Message.Chat.ID))
+	z := &redis.Z{
+		Score:  float64(time.Now().Unix()),
+		Member: c.update.Message.From.ID,
+	}
+	err := db.RDB.ZAdd(c.ctx, key, z).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+}

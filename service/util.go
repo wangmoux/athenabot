@@ -3,11 +3,14 @@ package service
 import (
 	"athenabot/client"
 	"athenabot/config"
+	"athenabot/db"
 	"athenabot/util"
 	"encoding/json"
 	"github.com/bitly/go-simplejson"
 	"io"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -57,7 +60,7 @@ func generateSimpleImagePhrases(strArray []string) []string {
 }
 
 func GenerateCallbackData(command string, userID int64, messageID int) string {
-	callbackData := CallbackData{Command: command, UserID: userID, MessageID: messageID}
+	callbackData := CallbackData{Command: command, UserID: userID, MsgID: messageID}
 	data, _ := json.Marshal(callbackData)
 	str := string(data)
 	str = strings.ReplaceAll(str, " ", "")
@@ -72,4 +75,53 @@ func ParseCallbackData(data string) (*CallbackData, error) {
 		return nil, err
 	}
 	return callbackData, nil
+}
+
+func (c *BotConfig) generateUserActivityData() ([]userActivity, error) {
+	key := util.StrBuilder(chatUserActivityDir, util.NumToStr(c.update.Message.Chat.ID))
+	userActivityRes, err := db.RDB.ZRange(c.ctx, key, 0, 10).Result()
+	if err != nil {
+		return nil, err
+	}
+	var userActivityData []userActivity
+
+	for _, userID := range userActivityRes {
+		lastTimeRes, err := db.RDB.ZScore(c.ctx, key, userID).Result()
+		if err != nil {
+			continue
+		}
+		nowTime := time.Now().Unix()
+		lastTime := int64(lastTimeRes)
+		if nowTime-lastTime > 86400*30 {
+			day := float64(nowTime-lastTime) / 86400
+
+			userID, err := strconv.ParseInt(userID, 10, 64)
+			if err != nil {
+				continue
+			}
+
+			userNameCache := &userNameCache{
+				userName: make(map[int64]string),
+			}
+			wg := new(sync.WaitGroup)
+			wg.Add(1)
+			c.getUserNameCache(wg, userID, userNameCache)
+
+			var fullName string
+			if name, ok := userNameCache.userName[userID]; ok {
+				fullName = name
+			} else {
+				fullName = "unknown"
+			}
+
+			userActivityData = append(userActivityData, userActivity{
+				userID:       userID,
+				fullName:     fullName,
+				inactiveDays: int(day),
+			})
+		}
+
+	}
+
+	return userActivityData, nil
 }

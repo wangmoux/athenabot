@@ -16,6 +16,7 @@ const (
 	administratorsCacheDir         = "bot:administrators_cache:"
 	chatUserprofileWatchDir        = "bot:chat_userprofile_watch:"
 	chatBlacklistDir               = "bot:chat_blacklist:"
+	chatUserActivityDir            = "bot:chat_user_activity:"
 )
 
 var (
@@ -28,7 +29,13 @@ type userNameCache struct {
 }
 
 type CallbackData struct {
-	Command   string `json:"command"`
-	UserID    int64  `json:"user_id"`
-	MessageID int    `json:"message_id"`
+	Command string `json:"command"`
+	UserID  int64  `json:"userID"`
+	MsgID   int    `json:"msgID"`
+}
+
+type userActivity struct {
+	userID       int64
+	fullName     string
+	inactiveDays int
 }

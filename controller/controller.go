@@ -33,8 +33,10 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 		logrus.Infof("callback:%+v", callbackData)
 		cb := service.NewCallBack(c, callbackData)
 		switch callbackData.Command {
-		case "clear":
+		case "clear-msg":
 			cb.ClearMy48hMessage()
+		case "clear-iu":
+			cb.ClearInactivityUsers()
 		}
 		return
 	}
@@ -111,6 +113,9 @@ func asyncController(ch asyncChannel) {
 			}
 			if c.IsEnableChatService("chat_blacklist") {
 				cc.ChatBlacklistHandler()
+			}
+			if c.IsEnableChatService("chat_user_activity") {
+				cc.ChatUserActivity()
 			}
 		}
 	}

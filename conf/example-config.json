@@ -54,7 +54,8 @@
     "chat_mars",
     "chat_mars_ocr",
     "chat_userprofile_watch",
-    "chat_blacklist"
+    "chat_blacklist",
+    "chat_user_activity"
   ],
   "private_commands": [
     "start"

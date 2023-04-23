@@ -25,6 +25,7 @@ func (c *CallBack) ClearMy48hMessage() {
 	if c.callbackData.UserID != c.update.CallbackQuery.From.ID {
 		return
 	}
+	commandMessageID, _ := c.callbackData.Data.(float64)
 	chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.callbackData.UserID))
 	messageIDs, err := db.RDB.HGetAll(c.ctx, chat48hMessageKey).Result()
 	if err != nil {
@@ -43,7 +44,7 @@ func (c *CallBack) ClearMy48hMessage() {
 		if time.Now().Unix()-int64(messageTime) > 172800 {
 			continue
 		}
-		if messageID == c.callbackData.MsgID {
+		if messageID == int(commandMessageID) {
 			continue
 		}
 		c.addDeleteMessageQueue(0, messageID)
@@ -63,13 +64,22 @@ func (c *CallBack) ClearInactivityUsers() {
 		logrus.Error(err)
 		return
 	}
-
+	inactiveDays, _ := c.callbackData.Data.(float64)
 	for _, data := range chatUserActivityData {
-		if c.callbackData.MsgID < 90 {
-			c.callbackData.MsgID = 90
+		if inactiveDays < 30 {
+			inactiveDays = 30
 		}
-		if data.inactiveDays >= c.callbackData.MsgID {
+		if data.inactiveDays >= int(inactiveDays) {
 			res, err := c.bot.Request(tgbotapi.BanChatMemberConfig{
+				ChatMemberConfig: tgbotapi.ChatMemberConfig{
+					ChatID: c.update.Message.Chat.ID,
+					UserID: data.userID,
+				},
+			})
+			if !res.Ok {
+				logrus.Errorln(res, err)
+			}
+			res, err = c.bot.Request(tgbotapi.UnbanChatMemberConfig{
 				ChatMemberConfig: tgbotapi.ChatMemberConfig{
 					ChatID: c.update.Message.Chat.ID,
 					UserID: data.userID,

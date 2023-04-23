@@ -29,9 +29,9 @@ type userNameCache struct {
 }
 
 type CallbackData struct {
-	Command string `json:"command"`
-	UserID  int64  `json:"userID"`
-	MsgID   int    `json:"msgID"`
+	Command string `json:"c"`
+	UserID  int64  `json:"u"`
+	Data    any    `json:"d,omitempty"`
 }
 
 type userActivity struct {

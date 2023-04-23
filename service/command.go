@@ -117,6 +117,10 @@ func (c *CommandConfig) commandLimitAdd(addCount int) {
 }
 
 func (c *CommandConfig) isLimitCommand(limit int) bool {
+	if config.Conf.LogLevel > 3 {
+		logrus.Warnln("ignore command limit log_level>3")
+		return false
+	}
 	commandLimitKey := util.StrBuilder(commandLimitKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":"+c.command, "_", util.NumToStr(c.update.Message.From.ID))
 	res, err := db.RDB.Exists(c.ctx, commandLimitKey).Result()
 	if err != nil {

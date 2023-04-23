@@ -6,6 +6,7 @@ import (
 	"athenabot/db"
 	"athenabot/util"
 	"encoding/json"
+	"errors"
 	"github.com/bitly/go-simplejson"
 	"io"
 	"strconv"
@@ -59,12 +60,11 @@ func generateSimpleImagePhrases(strArray []string) []string {
 	return res
 }
 
-func generateCallbackData(command string, userID int64, messageID int) string {
-	callbackData := CallbackData{Command: command, UserID: userID, MsgID: messageID}
-	data, _ := json.Marshal(callbackData)
-	str := string(data)
+func generateCallbackData(command string, userID int64, data any) string {
+	callbackData := CallbackData{Command: command, UserID: userID, Data: data}
+	d, _ := json.Marshal(callbackData)
+	str := string(d)
 	str = strings.ReplaceAll(str, " ", "")
-
 	return str
 }
 
@@ -73,6 +73,9 @@ func ParseCallbackData(data string) (*CallbackData, error) {
 	err := json.Unmarshal([]byte(data), callbackData)
 	if err != nil {
 		return nil, err
+	}
+	if len(callbackData.Command) == 0 {
+		return nil, errors.New("callback data command is nil")
 	}
 	return callbackData, nil
 }

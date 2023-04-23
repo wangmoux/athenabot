@@ -687,23 +687,23 @@ func (c *CommandConfig) chatUserActivityCommand() {
 	}
 
 	if len(c.commandArg) > 0 {
-		if c.isLimitCommand(1) {
+		if c.isLimitCommand(5) {
 			return
 		}
 
-		day, err := strconv.Atoi(c.commandArg)
+		inactiveDays, err := strconv.Atoi(c.commandArg)
 		if err != nil {
 			return
 		}
-		callbackData := generateCallbackData("clear-iu", c.handleUserID, day)
+		callbackData := generateCallbackData("clear-users", c.handleUserID, inactiveDays)
 		confirmButton := tgbotapi.NewInlineKeyboardButtonData("确定图图？", callbackData)
 		replyMarkup := tgbotapi.NewInlineKeyboardMarkup(
 			[]tgbotapi.InlineKeyboardButton{confirmButton},
 		)
 		c.messageConfig.ReplyMarkup = replyMarkup
-		c.messageConfig.Text = util.StrBuilder(util.NumToStr(day), " 天不活跃群友将会被图图\n")
+		c.messageConfig.Text = util.StrBuilder(util.NumToStr(inactiveDays), " 天不活跃群友将会被图图\n")
 		c.sendMessage()
-		c.commandLimitAdd(5)
+		c.commandLimitAdd(1)
 		return
 	}
 

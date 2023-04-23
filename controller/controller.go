@@ -35,7 +35,7 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 		switch callbackData.Command {
 		case "clear-msg":
 			cb.ClearMy48hMessage()
-		case "clear-iu":
+		case "clear-users":
 			cb.ClearInactivityUsers()
 		}
 		return

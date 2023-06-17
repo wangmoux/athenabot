@@ -83,12 +83,10 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 
 type asyncChannel chan *service.BotConfig
 
-var (
-	asyncMap            = make(map[int64]asyncChannel)
-	asyncControllerOnce sync.Once
-)
+var asyncMap = make(map[int64]asyncChannel)
 
 func asyncController(ch asyncChannel) {
+	var asyncControllerOnce sync.Once
 	for {
 		select {
 		case c := <-ch:

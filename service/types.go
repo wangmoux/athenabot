@@ -17,6 +17,7 @@ const (
 	chatUserprofileWatchDir        = "bot:chat_userprofile_watch:"
 	chatBlacklistDir               = "bot:chat_blacklist:"
 	chatUserActivityDir            = "bot:chat_user_activity:"
+	shareholdersDir                = "bot:shareholders:"
 )
 
 var (

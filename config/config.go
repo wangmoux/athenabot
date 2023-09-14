@@ -55,6 +55,7 @@ type Config struct {
 	Webhook          Webhook   `json:"webhook"`
 	MarsOCR          MarsOCR   `json:"mars_ocr"`
 	SudoAdmins       []int64   `json:"sudo_admins"`
+	OwnerID          int64     `json:"owner_id"`
 }
 
 var (

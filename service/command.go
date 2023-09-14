@@ -263,4 +263,10 @@ func init() {
 	commandsFunc["chat_user_activity"] = func(c *CommandConfig) {
 		c.chatUserActivityCommand()
 	}
+	commandsFunc["bot_shareholders"] = func(c *CommandConfig) {
+		c.botShareholdersCommand()
+	}
+	commandsFunc["bot_be_shareholder"] = func(c *CommandConfig) {
+		c.botBeShareholderCommand()
+	}
 }

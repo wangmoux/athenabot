@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"math/big"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -719,5 +720,68 @@ func (c *CommandConfig) chatUserActivityCommand() {
 	}
 
 	c.messageConfig.Text = msg
+	c.sendMessage()
+}
+
+func (c *CommandConfig) botShareholdersCommand() {
+	shareholdersKey := util.StrBuilder(shareholdersDir, "shareholders")
+	shareholdersData, err := db.RDB.HGetAll(c.ctx, shareholdersKey).Result()
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	wg := new(sync.WaitGroup)
+	userCache := &userNameCache{
+		userName: make(map[int64]string),
+	}
+	for id, _ := range shareholdersData {
+		wg.Add(1)
+		userID, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			continue
+		}
+		c.getUserNameCache(wg, userID, userCache)
+	}
+	c.messageConfig.Text = "本BOT股东成员（排名不分先后）\n"
+	for id, title := range shareholdersData {
+		userID, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			continue
+		}
+		name, ok := userCache.userName[userID]
+		if ok {
+			c.messageConfig.Text += util.StrBuilder(name, " ", title, "\n")
+		}
+	}
+	c.sendMessage()
+}
+
+func (c *CommandConfig) botBeShareholderCommand() {
+	shareholdersKey := util.StrBuilder(shareholdersDir, "shareholders")
+	c.mustReply = true
+	c.canHandleSelf = true
+	c.canHandleNoAdminReply = true
+	c.canHandleAdminReply = true
+	if !c.isApproveCommandRule() {
+		return
+	}
+	if c.update.Message.From.ID != config.Conf.OwnerID {
+		c.messageConfig.Text = "你不是董事长，无权邀请董事会成员"
+		c.sendMessage()
+		return
+	}
+	err := db.RDB.HSet(c.ctx, shareholdersKey, c.handleUserID, c.commandArg).Err()
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	logrus.Infof("handle_user:%v command_arg:%v", c.handleUserID, c.commandArg)
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 加入董事会，职位为", c.commandArg)
 	c.sendMessage()
 }

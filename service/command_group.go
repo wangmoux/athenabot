@@ -782,6 +782,8 @@ func (c *CommandConfig) botBeShareholderCommand() {
 		Length: util.TGNameWidth(c.handleUserName),
 		User:   &tgbotapi.User{ID: c.handleUserID},
 	}}
+	c.botMessageCleanCountdown = 0
+	c.commandMessageCleanCountdown = 0
 	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 加入董事会，职位为", c.commandArg)
 	c.sendMessage()
 }

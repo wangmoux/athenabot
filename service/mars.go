@@ -31,7 +31,7 @@ func NewMarsConfig(botConfig *BotConfig) *MarsConfig {
 }
 
 func (c *MarsConfig) getMars() {
-	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", c.marsID)
+	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.chatID), ":", c.marsID)
 	res, err := db.RDB.Get(c.ctx, marsKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -40,7 +40,7 @@ func (c *MarsConfig) getMars() {
 }
 
 func (c *MarsConfig) setMars() {
-	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", c.marsID)
+	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.chatID), ":", c.marsID)
 	c.currentMars.MsgID = c.update.Message.MessageID
 	marsJson, _ := json.Marshal(c.currentMars)
 	if err := db.RDB.Set(c.ctx, marsKey, marsJson, time.Second*time.Duration(config.Conf.KeyTTL)).Err(); err != nil {
@@ -49,7 +49,7 @@ func (c *MarsConfig) setMars() {
 }
 
 func (c *MarsConfig) isMarsExists() bool {
-	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", c.marsID)
+	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.chatID), ":", c.marsID)
 	res, err := db.RDB.Exists(c.ctx, marsKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -66,7 +66,7 @@ func (c *MarsConfig) handleMars() {
 	c.currentMars.Count = c.latestMars.Count + 1
 	c.setMars()
 
-	humanChatID := c.update.Message.Chat.ID - c.update.Message.Chat.ID - c.update.Message.Chat.ID - 1000000000000
+	humanChatID := c.chatID - c.chatID - c.chatID - 1000000000000
 	LatestMarsMessage := util.StrBuilder("https://t.me/c/", util.NumToStr(humanChatID), "/", util.NumToStr(c.latestMars.MsgID))
 	c.messageConfig.Text = util.StrBuilder("这条愚蠢的消息已经火星", util.NumToStr(c.currentMars.Count), "次了！！!")
 	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
@@ -76,7 +76,7 @@ func (c *MarsConfig) handleMars() {
 		Length: 2,
 	},
 	}
-	c.sendMessage()
+	c.sendCommandMessage()
 	logrus.Infof("mars_user:%v mars_id:%v", c.update.Message.From.ID, c.marsID)
 	t := newTopConfig(c.BotConfig)
 	t.setTop(marsTopKeyDir, c.update.Message.From.ID, 1)
@@ -143,7 +143,7 @@ func (c *MarsConfig) handleImageDoc(imagePhrases []string, pHash uint64) {
 	imageDoc := model.ImageDocPool.Get().(*model.ImageDoc)
 	imageDoc = &model.ImageDoc{
 		MarsID:     util.NumToStr(pHash),
-		ChatID:     c.update.Message.Chat.ID,
+		ChatID:     c.chatID,
 		CreateTime: time.Now().UTC(),
 	}
 	defer model.ImageDocPool.Put(imageDoc)

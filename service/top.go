@@ -6,7 +6,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -21,7 +20,7 @@ func newTopConfig(botConfig *BotConfig) *topConfig {
 }
 
 func (c *topConfig) setTop(topKey string, userID int64, addScore float64) {
-	key := util.StrBuilder(topKey + util.NumToStr(c.update.Message.Chat.ID))
+	key := util.StrBuilder(topKey + util.NumToStr(c.chatID))
 	nowTimestampInt := time.Now().UnixMilli()
 	nowTimestampFloat, _ := strconv.ParseFloat("0."+util.NumToStr(nowTimestampInt), 64)
 	var score float64
@@ -50,38 +49,27 @@ func (c *topConfig) setTop(topKey string, userID int64, addScore float64) {
 }
 
 func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
-	key := util.StrBuilder(topKey, util.NumToStr(c.update.Message.Chat.ID))
+	key := util.StrBuilder(topKey, util.NumToStr(c.chatID))
 	var topText string
 	resTopUser, err := db.RDB.ZRevRange(c.ctx, key, 0, 9).Result()
 	if err != nil {
 		logrus.Error(err)
 	}
-	userNames := &userNameCache{userName: make(map[int64]string)}
-	func() {
-		wg := new(sync.WaitGroup)
-		for _, userId := range resTopUser {
-			id, _ := strconv.ParseInt(userId, 10, 64)
-			wg.Add(1)
-			go c.getUserNameCache(wg, id, userNames)
-		}
-		wg.Wait()
-	}()
 	for _, userId := range resTopUser {
 		id, _ := strconv.ParseInt(userId, 10, 64)
 		score, err := db.RDB.ZScore(c.ctx, key, userId).Result()
 		if err != nil {
 			logrus.Error(err)
 		}
-		firstName, _ := userNames.userName[id]
-		if len(firstName) == 0 {
+		chatMember := c.getUserCache(id)
+		if chatMember.Status == "deleted" || chatMember.Status == "kicked" {
 			err := db.RDB.ZRem(c.ctx, key, id).Err()
 			if err != nil {
 				logrus.Error(err)
 			}
-			firstName = "无名"
 		}
-		topText += util.StrBuilder(firstName, " ", topPrefix, util.NumToStr(score), topSuffix, "\n")
+		topText += util.StrBuilder(chatMember.User.FirstName, " ", topPrefix, util.NumToStr(score), topSuffix, "\n")
 	}
 	c.messageConfig.Text = topText
-	c.sendMessage()
+	c.sendCommandMessage()
 }

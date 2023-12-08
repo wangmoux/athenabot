@@ -11,7 +11,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -81,7 +80,7 @@ func ParseCallbackData(data string) (*CallbackData, error) {
 }
 
 func (c *BotConfig) generateUserActivityData() ([]userActivity, error) {
-	key := util.StrBuilder(chatUserActivityDir, util.NumToStr(c.update.Message.Chat.ID))
+	key := util.StrBuilder(chatUserActivityDir, util.NumToStr(c.chatID))
 	userActivityRes, err := db.RDB.ZRange(c.ctx, key, 0, 10).Result()
 	if err != nil {
 		return nil, err
@@ -95,34 +94,18 @@ func (c *BotConfig) generateUserActivityData() ([]userActivity, error) {
 		}
 		nowTime := time.Now().Unix()
 		lastTime := int64(lastTimeRes)
-		if nowTime-lastTime > 86400*30 {
-			day := float64(nowTime-lastTime) / 86400
+		day := float64(nowTime-lastTime) / 86400
 
-			userID, err := strconv.ParseInt(userID, 10, 64)
-			if err != nil {
-				continue
-			}
-
-			userNameCache := &userNameCache{
-				userName: make(map[int64]string),
-			}
-			wg := new(sync.WaitGroup)
-			wg.Add(1)
-			c.getUserNameCache(wg, userID, userNameCache)
-
-			var fullName string
-			if name, ok := userNameCache.userName[userID]; ok {
-				fullName = name
-			} else {
-				fullName = "unknown"
-			}
-
-			userActivityData = append(userActivityData, userActivity{
-				userID:       userID,
-				fullName:     fullName,
-				inactiveDays: int(day),
-			})
+		userID, err := strconv.ParseInt(userID, 10, 64)
+		if err != nil {
+			continue
 		}
+
+		userActivityData = append(userActivityData, userActivity{
+			userID:       userID,
+			fullName:     c.getUserCache(userID).User.FirstName,
+			inactiveDays: int(day),
+		})
 
 	}
 

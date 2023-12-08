@@ -1,63 +1,12 @@
 {
-  "mars_ocr": {
-    "enable_ocr": true,
-    "doc_provider": "mongo",
-    "doc_url": "mongodb://localhost:27017",
-    "ocr_url": "http://localhost:8080/ocr",
-    "ocr_provider": "azure",
-    "min_phrase": 6,
-    "min_hit_ratio": 0.6
-  },
   "updates_type": "polling",
-  "webhook": {
-    "endpoint": "https://example.com:8443/",
-    "cert_file": "./server.pem",
-    "cert_key_file": "./server.key",
-    "listen_addr": "0.0.0.0:8081",
-    "token": ""
-  },
   "modules": {
-    "enable_mars": true,
+    "enable_mars": false,
     "enable_command": true,
     "enable_private_command": true
   },
-  "whitelist": {
-    "groups_id": [
-    ],
-    "groups_username": [
-    ]
-  },
-  "disable_whitelist": false,
   "redis_host": "172.17.0.2:6379",
   "bot_token": "",
   "key_ttl": 31557600,
-  "log_level": 2,
-  "commands": [
-    "studytop",
-    "marstop",
-    "study",
-    "ban",
-    "dban",
-    "unban",
-    "rt",
-    "unrt",
-    "enable",
-    "disable",
-    "warn",
-    "unwarn",
-    "doudou",
-    "doudoutop",
-    "honortop",
-    "clear_my_48h_message",
-    "chat_member_verify",
-    "chat_limit",
-    "chat_mars",
-    "chat_mars_ocr",
-    "chat_userprofile_watch",
-    "chat_blacklist",
-    "chat_user_activity"
-  ],
-  "private_commands": [
-    "start"
-  ]
+  "log_level": 2
 }

@@ -1,5 +1,7 @@
 package service
 
+import "sync"
+
 const (
 	marsKeyDir                     = "bot:mars_data:"
 	marsTopKeyDir                  = "bot:mars_top:"
@@ -12,22 +14,29 @@ const (
 	doudouTopKeyDir                = "bot:doudou_top:"
 	chat48hMessageDir              = "bot:chat_48h_message:"
 	chat48hMessageDeleteCrontabDir = "bot:chat_48h_message_delete_crontab:"
-	userNameCacheDir               = "bot:user_name_cache:"
 	administratorsCacheDir         = "bot:administrators_cache:"
+	usersCacheDir                  = "bot:users_cache:"
 	chatUserprofileWatchDir        = "bot:chat_userprofile_watch:"
 	chatBlacklistDir               = "bot:chat_blacklist:"
 	chatUserActivityDir            = "bot:chat_user_activity:"
 	shareholdersDir                = "bot:shareholders:"
+	sudoAdministratorsDir          = "bot:sudo_administrators"
+	heiWuLeiDir                    = "bot:hei_wu_lei:"
+	groupWhitelistDir              = "bot:group_whitelist:"
+	marsWhitelistDir               = "bot:mars_whitelist:"
+)
+
+const (
+	userIsNotFoundMessage = "user not found"
 )
 
 var (
-	commandsFunc    = make(map[string]func(c *CommandConfig))
-	groupsChatLimit = make(map[int64]*chatLimit)
+	commandsGroupFunc         = make(map[string]func(c *CommandConfig))
+	commandsPrivateFunc       = make(map[string]func(c *CommandConfig))
+	groupsChatLimit           = make(map[int64]*chatLimit)
+	sudoAdminOnce             sync.Once
+	inlineQueryResultArticles []any
 )
-
-type userNameCache struct {
-	userName map[int64]string
-}
 
 type CallbackData struct {
 	Command string `json:"c"`

@@ -74,7 +74,11 @@ func TGNameWidth(name string) int {
 	var width int
 	gr := uniseg.NewGraphemes(name)
 	for gr.Next() {
-		if strings.Contains(fmt.Sprintf("%U", gr.Runes()), "U+1F") {
+		if strings.HasPrefix(fmt.Sprintf("%U", gr.Runes()), "[U+1F") {
+			width += len(gr.Runes()) * 2
+			continue
+		}
+		if strings.HasPrefix(fmt.Sprintf("%U", gr.Runes()), "[U+1D") {
 			width += len(gr.Runes()) * 2
 			continue
 		}

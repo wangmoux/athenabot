@@ -6,10 +6,10 @@ import (
 	"athenabot/util"
 	"context"
 	"encoding/json"
-	"github.com/bitly/go-simplejson"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,38 +22,31 @@ type BotConfig struct {
 	cancel                   context.CancelFunc
 	botMessageCleanCountdown int
 	botMessageID             int
+	chatID                   int64
 }
 
-func NewBotConfig(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update tgbotapi.Update) *BotConfig {
+func NewBotConfig(ctx context.Context, bot *tgbotapi.BotAPI, update tgbotapi.Update) *BotConfig {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	botConfig := &BotConfig{
 		ctx:    ctx,
 		cancel: cancel,
 		update: update,
 		bot:    bot,
-		messageConfig: tgbotapi.MessageConfig{
-			BaseChat: tgbotapi.BaseChat{
-				ChatID:           update.Message.Chat.ID,
-				ReplyToMessageID: update.Message.MessageID,
-			},
-			Text:     "无言以对",
-			Entities: []tgbotapi.MessageEntity{},
-		},
 	}
 	return botConfig
 }
 
-func (c *BotConfig) isCloseWork() bool {
-	select {
-	case <-c.ctx.Done():
-		return true
-	default:
-		return false
-	}
+func (c *BotConfig) SetChatID(chatID int64) {
+	c.chatID = chatID
 }
 
-func (c *BotConfig) sendMessage() {
-	msg := tgbotapi.NewMessage(c.update.Message.Chat.ID, c.messageConfig.Text)
-	msg = c.messageConfig
+func (c *BotConfig) sendCommandMessage() {
+	msg := c.messageConfig
+	msg.ChatID = c.chatID
+	msg.ReplyToMessageID = c.update.Message.MessageID
+	if msg.Text == "" {
+		msg.Text = "无言以对"
+	}
 	req, err := c.bot.Send(msg)
 	if err != nil {
 		logrus.Error(err)
@@ -63,142 +56,195 @@ func (c *BotConfig) sendMessage() {
 	logrus.Debugf("send_msg:%v", util.LogMarshal(msg))
 }
 
+func (c *BotConfig) sendRequestMessage(ct tgbotapi.Chattable) {
+	req, err := c.bot.Request(ct)
+	if !req.Ok {
+		logrus.Errorln(req.ErrorCode, err)
+	}
+	logrus.Debugf("send_msg:%v", util.LogMarshal(ct))
+}
+
 func (c *BotConfig) isAdmin(userID int64) bool {
-	administratorsCacheKey := util.StrBuilder(administratorsCacheDir, util.NumToStr(c.update.Message.Chat.ID))
+	if c.isSudoAdmin(userID) {
+		return true
+	}
+	if userID == 1087968824 {
+		return true
+	}
+	var isAdmin bool
+	administratorsCacheKey := util.StrBuilder(administratorsCacheDir, util.NumToStr(c.chatID))
 	keyExists, err := db.RDB.Exists(c.ctx, administratorsCacheKey).Result()
 	if err != nil {
 		logrus.Error(err)
 	}
 	if keyExists > 0 {
-		isAdministrator, err := db.RDB.SIsMember(c.ctx, administratorsCacheKey, userID).Result()
+		isAdmin, err = db.RDB.HExists(c.ctx, administratorsCacheKey, util.NumToStr(userID)).Result()
 		if err != nil {
 			logrus.Error(err)
 		}
-		if isAdministrator {
-			return true
-		}
+
 	} else {
 		req, err := c.bot.Request(tgbotapi.ChatAdministratorsConfig{
 			ChatConfig: tgbotapi.ChatConfig{
-				ChatID: c.update.Message.Chat.ID,
+				ChatID: c.chatID,
 			},
 		})
 
 		if !req.Ok {
 			logrus.Errorln(req.ErrorCode, err)
-			return false
 		}
-
-		resJson := &simplejson.Json{}
-		resJson, _ = simplejson.NewJson(req.Result)
-		chatAdministrators := resJson.MustArray()
-		chatAdministratorsMap := make(map[int64]uint8)
-		for i := range chatAdministrators {
-			id := resJson.GetIndex(i).Get("user").Get("id").MustInt64()
-			chatAdministratorsMap[id] = 0
+		var chatMembers []tgbotapi.ChatMember
+		err = json.Unmarshal(req.Result, &chatMembers)
+		if err != nil {
+			logrus.Error(err)
 		}
-		for _, id := range config.Conf.SudoAdmins {
-			chatAdministratorsMap[id] = 0
-		}
-		for id := range chatAdministratorsMap {
-			err := db.RDB.SAdd(c.ctx, administratorsCacheKey, id).Err()
+		for _, members := range chatMembers {
+			if members.User.ID == userID {
+				isAdmin = true
+			}
+			membersStr, _ := json.Marshal(members)
+			err := db.RDB.HSet(c.ctx, administratorsCacheKey, members.User.ID, membersStr).Err()
 			if err != nil {
 				logrus.Error(err)
 			}
 		}
-		err = db.RDB.Expire(c.ctx, administratorsCacheKey, time.Second*86400).Err()
+		err = db.RDB.Expire(c.ctx, administratorsCacheKey, time.Second*3600).Err()
 		if err != nil {
 			logrus.Error(err)
 		}
-		if _, _ok := chatAdministratorsMap[userID]; _ok {
-			return true
-		}
 	}
-	return false
+	return isAdmin
 }
 
-func (c *BotConfig) getUserNameCache(wg *sync.WaitGroup, userID int64, cache *userNameCache) {
-	defer wg.Done()
-	userNameCacheKey := util.StrBuilder(userNameCacheDir, util.NumToStr(userID))
-	keyExists, err := db.RDB.Exists(c.ctx, userNameCacheKey).Result()
+func (c *BotConfig) isAdminCanRestrictMembers(userID int64) bool {
+	if c.isSudoAdmin(userID) {
+		return true
+	}
+	if userID == 1087968824 {
+		return true
+	}
+	if !c.isAdmin(userID) {
+		return false
+	}
+	administratorsCacheKey := util.StrBuilder(administratorsCacheDir, util.NumToStr(c.chatID))
+	req, err := db.RDB.HGet(c.ctx, administratorsCacheKey, util.NumToStr(userID)).Result()
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	var chatMembers *tgbotapi.ChatMember
+	err = json.Unmarshal([]byte(req), &chatMembers)
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	return chatMembers.CanRestrictMembers
+}
+
+func (c *BotConfig) getUserCache(userID int64) *tgbotapi.ChatMember {
+	chatMember := &tgbotapi.ChatMember{
+		User: &tgbotapi.User{},
+	}
+	userCacheKey := util.StrBuilder(usersCacheDir, util.NumToStr(c.chatID), ":", util.NumToStr(userID))
+	keyExists, err := db.RDB.Exists(c.ctx, userCacheKey).Result()
 	if err != nil {
 		logrus.Error(err)
 	}
-	var userName string
 	if keyExists > 0 {
-		userName, err = db.RDB.Get(c.ctx, userNameCacheKey).Result()
+		userReq, err := db.RDB.Get(c.ctx, userCacheKey).Result()
 		if err != nil {
 			logrus.Error(err)
 		}
+		err = json.Unmarshal([]byte(userReq), &chatMember)
+		if err != nil {
+			logrus.Error(err)
+		}
+		return chatMember
 	} else {
 		req, err := c.bot.Request(tgbotapi.GetChatMemberConfig{
 			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
-				ChatID: c.update.Message.Chat.ID,
+				ChatID: c.chatID,
 				UserID: userID,
 			},
 		})
 		if req.Ok {
-			userJson := &simplejson.Json{}
-			userJson, _ = simplejson.NewJson(req.Result)
-			userName = userJson.Get("user").Get("first_name").MustString()
-			if len(userName) > 0 {
-				err = db.RDB.Set(c.ctx, userNameCacheKey, userName, time.Second*86400).Err()
-				if err != nil {
-					logrus.Error(err)
-				}
+			err = json.Unmarshal(req.Result, &chatMember)
+			if err != nil {
+				logrus.Error(err)
+			}
+			if len(chatMember.User.UserName) == 0 {
+				chatMember.User.UserName = "unknown"
+			}
+			if len(chatMember.User.FirstName)+len(chatMember.User.LastName) == 0 {
+				chatMember.User.FirstName = "无名氏"
+			}
+			err = db.RDB.Set(c.ctx, userCacheKey, string(req.Result), time.Second*3600).Err()
+			if err != nil {
+				logrus.Error(err)
 			}
 		} else {
 			logrus.Errorln(req.ErrorCode, err)
+			if strings.HasSuffix(req.Description, userIsNotFoundMessage) {
+				chatMember.Status = "deleted"
+				chatMember.User.UserName = "unknown"
+				chatMember.User.FirstName = "无名氏"
+			}
 		}
 	}
-	cache.userName[userID] = userName
+	return chatMember
 }
 
-func (c *BotConfig) DeleteMessageCronHandler() {
-	logrus.Infof("new delete_message_cron_handler:%v", c.update.Message.Chat.ID)
-	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
+func (c *BotConfig) DeleteMessageCronHandler(ctx context.Context) {
+	logrus.Infof("new delete_message_cron_handler:%v", c.chatID)
+	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.chatID))
 	ticker := time.NewTicker(time.Second * 5)
-	for range ticker.C {
-		res, err := db.RDB.HGetAll(context.Background(), deleteMessageKey).Result()
-		if err != nil {
-			logrus.Error(err)
-			continue
+	for {
+		select {
+		case <-ticker.C:
+			res, err := db.RDB.HGetAll(context.Background(), deleteMessageKey).Result()
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			wg := new(sync.WaitGroup)
+			for k, v := range res {
+				time.Sleep(time.Millisecond * 10)
+				wg.Add(1)
+				go func(k, v string, wg *sync.WaitGroup) {
+					defer wg.Done()
+					deleteTime, err := strconv.Atoi(v)
+					if err != nil {
+						return
+					}
+					if int64(deleteTime) > time.Now().Unix() {
+						return
+					}
+					messageID, err := strconv.Atoi(k)
+					if err != nil {
+						return
+					}
+					req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
+						ChatID:    c.chatID,
+						MessageID: messageID,
+					})
+					if !req.Ok {
+						logrus.Warnln(req.ErrorCode, err)
+					}
+					if err := db.RDB.HDel(context.Background(), deleteMessageKey, util.NumToStr(messageID)).Err(); err != nil {
+						logrus.Error(err)
+					}
+				}(k, v, wg)
+			}
+			wg.Wait()
+		case <-ctx.Done():
+			logrus.Infof("delete_message_cron_handler exited:%v", c.chatID)
+			return
 		}
-		wg := new(sync.WaitGroup)
-		for k, v := range res {
-			time.Sleep(time.Millisecond * 10)
-			wg.Add(1)
-			go func(k, v string, wg *sync.WaitGroup) {
-				defer wg.Done()
-				deleteTime, err := strconv.Atoi(v)
-				if err != nil {
-					return
-				}
-				if int64(deleteTime) > time.Now().Unix() {
-					return
-				}
-				messageID, err := strconv.Atoi(k)
-				if err != nil {
-					return
-				}
-				req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
-					ChatID:    c.update.Message.Chat.ID,
-					MessageID: messageID,
-				})
-				if !req.Ok {
-					logrus.Warnln(req.ErrorCode, err)
-				}
-				if err := db.RDB.HDel(context.Background(), deleteMessageKey, util.NumToStr(messageID)).Err(); err != nil {
-					logrus.Error(err)
-				}
-			}(k, v, wg)
-		}
-		wg.Wait()
 	}
 }
 
 func (c *BotConfig) addDeleteMessageQueue(delay int, messageID int) {
-	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.update.Message.Chat.ID))
+	deleteMessageKey := util.StrBuilder(deleteMessageKeyDir, util.NumToStr(c.chatID))
 	if err := db.RDB.HMSet(context.Background(), deleteMessageKey, messageID, time.Now().Unix()+int64(delay)).Err(); err != nil {
 		logrus.Error(err)
 	}
@@ -207,7 +253,7 @@ func (c *BotConfig) addDeleteMessageQueue(delay int, messageID int) {
 func (c *BotConfig) getChatMember(userID int64) (tgbotapi.ChatMember, error) {
 	req, err := c.bot.Request(tgbotapi.GetChatMemberConfig{
 		ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: userID,
 		},
 	})
@@ -221,14 +267,94 @@ func (c *BotConfig) getChatMember(userID int64) (tgbotapi.ChatMember, error) {
 }
 
 func (c *BotConfig) IsEnableChatService(service string) bool {
-	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
-	res, err := db.RDB.Exists(c.ctx, util.StrBuilder(commandSwitchKey, service)).Result()
+	if service == "enable" || service == "disable" {
+		return true
+	}
+	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.chatID), ":disable_")
+
+	allRes, err := db.RDB.Exists(c.ctx, util.StrBuilder(commandSwitchKey, "all")).Result()
 	if err != nil {
 		logrus.Error(err)
 		return false
 	}
-	if res > 0 {
+
+	serviceRes, err := db.RDB.Exists(c.ctx, util.StrBuilder(commandSwitchKey, service)).Result()
+	if err != nil {
+		logrus.Error(err)
 		return false
+	}
+
+	if allRes+serviceRes > 0 {
+		return false
+	}
+	return true
+}
+
+func (c *BotConfig) sudoAdmins() {
+	sudoAdminOnce.Do(func() {
+		sudoAdministratorsKey := util.StrBuilder(sudoAdministratorsDir, ":", util.NumToStr(c.bot.Self.ID))
+		keyExists, err := db.RDB.Exists(c.ctx, sudoAdministratorsKey).Result()
+		if err != nil {
+			logrus.Error(err)
+		}
+		if keyExists > 0 {
+			err := db.RDB.Del(c.ctx, sudoAdministratorsKey).Err()
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+		for _, i := range config.Conf.SudoAdmins {
+			err := db.RDB.SAdd(c.ctx, sudoAdministratorsKey, i).Err()
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+	})
+}
+
+func (c *BotConfig) isSudoAdmin(userID int64) bool {
+	c.sudoAdmins()
+	sudoAdministratorsKey := util.StrBuilder(sudoAdministratorsDir, ":", util.NumToStr(c.bot.Self.ID))
+	userExists, err := db.RDB.SIsMember(c.ctx, sudoAdministratorsKey, userID).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	return userExists
+}
+
+func (c *BotConfig) IsGroupWhitelist(username string) bool {
+	if !config.Conf.EnableWhitelist {
+		return true
+	}
+	groupWhitelistKey := util.StrBuilder(groupWhitelistDir, util.NumToStr(c.bot.Self.ID))
+	isMember, err := db.RDB.SIsMember(c.ctx, groupWhitelistKey, username).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	return isMember
+}
+
+func (c *BotConfig) IsMarsWhitelist(username string) bool {
+	if !config.Conf.MarsOCR.EnableWhitelist {
+		return true
+	}
+	marsWhitelistKey := util.StrBuilder(marsWhitelistDir, util.NumToStr(c.bot.Self.ID))
+	isMember, err := db.RDB.SIsMember(c.ctx, marsWhitelistKey, username).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	return isMember
+}
+
+func (c *BotConfig) IsCommand() bool {
+	util.LogMarshal(c.update)
+	if !c.update.Message.IsCommand() {
+		return false
+	}
+	if c.update.Message.Command() != c.update.Message.CommandWithAt() {
+		if c.update.Message.CommandWithAt() != util.StrBuilder(c.update.Message.Command(), "@", c.bot.Self.UserName) {
+			return false
+		}
 	}
 	return true
 }

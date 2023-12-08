@@ -10,17 +10,10 @@ import (
 	"runtime"
 )
 
-type Whitelist struct {
-	GroupsId       []int64  `json:"groups_id,omitempty"`
-	GroupsUsername []string `json:"groups_username,omitempty"`
-}
-
 type Modules struct {
-	EnableMemberVerify   bool `json:"enable_member_verify"`
 	EnableMars           bool `json:"enable_mars"`
 	EnableCommand        bool `json:"enable_command"`
 	EnablePrivateCommand bool `json:"enable_private_command"`
-	EnableChatLimit      bool `json:"enable_chat_limit"`
 }
 
 type Webhook struct {
@@ -32,38 +25,42 @@ type Webhook struct {
 }
 
 type MarsOCR struct {
-	EnableOCR   bool    `json:"enable_ocr"`
-	DocURL      string  `json:"doc_url"`
-	DocProvider string  `json:"doc_provider"`
-	OcrURL      string  `json:"ocr_url"`
-	OcrProvider string  `json:"ocr_provider"`
-	MinPhrase   int     `json:"min_phrase"`
-	MinHitRatio float32 `json:"min_hit_ratio"`
+	EnableOCR       bool    `json:"enable_ocr"`
+	EnableWhitelist bool    `json:"disable_whitelist"`
+	DocURL          string  `json:"doc_url"`
+	DocProvider     string  `json:"doc_provider"`
+	OcrURL          string  `json:"ocr_url"`
+	OcrProvider     string  `json:"ocr_provider"`
+	MinPhrase       int     `json:"min_phrase"`
+	MinHitRatio     float32 `json:"min_hit_ratio"`
+}
+
+type InlineQueryResultArticle struct {
+	Title       string `json:"title"`
+	MessageText string `json:"message_text"`
 }
 
 type Config struct {
-	Whitelist        Whitelist `json:"whitelist"`
-	DisableWhitelist bool      `json:"disable_whitelist"`
-	RedisHost        string    `json:"redis_host"`
-	BotToken         string    `json:"bot_token"`
-	KeyTTL           uint      `json:"key_ttl"`
-	LogLevel         uint8     `json:"log_level"`
-	Commands         []string  `json:"commands"`
-	PrivateCommands  []string  `json:"private_commands"`
-	Modules          Modules   `json:"modules"`
-	UpdatesType      string    `json:"updates_type"`
-	Webhook          Webhook   `json:"webhook"`
-	MarsOCR          MarsOCR   `json:"mars_ocr"`
-	SudoAdmins       []int64   `json:"sudo_admins"`
-	OwnerID          int64     `json:"owner_id"`
+	EnableWhitelist           bool                       `json:"enable_whitelist"`
+	RedisHost                 string                     `json:"redis_host"`
+	BotToken                  string                     `json:"bot_token"`
+	KeyTTL                    uint                       `json:"key_ttl"`
+	LogLevel                  uint8                      `json:"log_level"`
+	DisableCommands           []string                   `json:"disable_commands"`
+	DisablePrivateCommands    []string                   `json:"disable_private_commands"`
+	Modules                   Modules                    `json:"modules"`
+	UpdatesType               string                     `json:"updates_type"`
+	Webhook                   Webhook                    `json:"webhook"`
+	MarsOCR                   MarsOCR                    `json:"mars_ocr"`
+	SudoAdmins                []int64                    `json:"sudo_admins"`
+	OwnerID                   int64                      `json:"owner_id"`
+	InlineQueryResultArticles []InlineQueryResultArticle `json:"inline_query_result_articles"`
 }
 
 var (
-	Conf                 Config
-	PrivateCommandsMap   = make(map[string]uint8)
-	CommandsMap          = make(map[string]uint8)
-	WhitelistUsernameMap = make(map[string]int)
-	WhitelistIdMap       = make(map[int64]int)
+	Conf                      Config
+	DisablePrivateCommandsMap = make(map[string]uint8)
+	DisableCommandsMap        = make(map[string]uint8)
 )
 
 func init() {
@@ -83,17 +80,11 @@ func init() {
 		logrus.Fatalln(err)
 	}
 
-	for _, i := range Conf.Commands {
-		CommandsMap[i] = 0
+	for _, i := range Conf.DisableCommands {
+		DisableCommandsMap[i] = 0
 	}
-	for _, i := range Conf.PrivateCommands {
-		PrivateCommandsMap[i] = 0
-	}
-	for _, i := range Conf.Whitelist.GroupsUsername {
-		WhitelistUsernameMap[i] = 0
-	}
-	for _, i := range Conf.Whitelist.GroupsId {
-		WhitelistIdMap[i] = 0
+	for _, i := range Conf.DisablePrivateCommands {
+		DisablePrivateCommandsMap[i] = 0
 	}
 
 	switch {

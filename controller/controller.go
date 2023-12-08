@@ -2,6 +2,7 @@ package controller
 
 import (
 	"athenabot/config"
+	"athenabot/model"
 	"athenabot/service"
 	"athenabot/util"
 	"context"
@@ -10,22 +11,20 @@ import (
 	"sync"
 )
 
-func isInWhitelist(ChatUserName string, chatID int64) bool {
-	if len(ChatUserName) > 1 {
-		if _, ok := config.WhitelistUsernameMap[ChatUserName]; ok {
-			return true
-		}
-	}
-	if _, ok := config.WhitelistIdMap[chatID]; ok {
-		return true
-	}
-	return false
-}
-
-func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfig) {
+	update := uc.Update
 	logrus.DebugFn(util.LogMarshalFn(update))
-	c := service.NewBotConfig(ctx, cancel, bot, update)
-	if update.CallbackQuery != nil {
+	if len(uc.UpdateType) == 0 || uc.ChatID == 0 {
+		logrus.Debugf("unsupported update:%s", util.LogMarshal(update))
+		return
+	}
+	c := service.NewBotConfig(ctx, bot, update)
+	c.SetChatID(uc.ChatID)
+
+	switch uc.UpdateType {
+	case model.InlineType:
+		service.NewInlineQueryConfig(c).HandleInlineQuery()
+	case model.CallbackType:
 		callbackData, err := service.ParseCallbackData(update.CallbackQuery.Data)
 		if err != nil {
 			return
@@ -38,44 +37,43 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 		case "clear-users":
 			cb.ClearInactivityUsers()
 		}
-		return
-	}
-
-	if update.Message != nil {
-		switch update.Message.Chat.Type {
-		case "supergroup", "group":
-			if config.Conf.DisableWhitelist || isInWhitelist(update.Message.Chat.UserName, update.Message.Chat.ID) {
+	case model.MessageType:
+		switch uc.ChatType {
+		case model.PrivateType:
+			if config.Conf.Modules.EnablePrivateCommand && c.IsCommand() {
+				service.NewCommandConfig(c).InPrivateCommands()
+				return
+			}
+		default:
+			if c.IsGroupWhitelist(update.Message.Chat.UserName) {
 				func() {
-					if ch, ok := asyncMap[update.Message.Chat.ID]; ok {
-						ch <- c
+					if ch, ok := asyncMap.Load(uc.ChatID); ok {
+						ch.(asyncChannel) <- c
 						return
 					}
 					logrus.Infof("new async_controller:%v", update.Message.Chat.ID)
 					ch := make(asyncChannel, 10)
-					asyncMap[update.Message.Chat.ID] = ch
-					go asyncController(ch)
+					asyncMap.Store(uc.ChatID, ch)
+					go asyncController(ctx, ch, uc.ChatID)
 					ch <- c
 				}()
 				if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") {
-					if len(update.Message.Photo) > 0 {
-						service.NewMarsConfig(c).HandlePhoto()
-						return
-					}
-					if update.Message.Video != nil {
-						service.NewMarsConfig(c).HandleVideo()
-						return
+					if c.IsMarsWhitelist(update.Message.Chat.UserName) {
+						if len(update.Message.Photo) > 0 {
+							service.NewMarsConfig(c).HandlePhoto()
+							return
+						}
+						if update.Message.Video != nil {
+							service.NewMarsConfig(c).HandleVideo()
+							return
+						}
 					}
 
 				}
-				if config.Conf.Modules.EnableCommand && update.Message.IsCommand() {
+				if config.Conf.Modules.EnableCommand && c.IsCommand() {
 					service.NewCommandConfig(c).InCommands()
 					return
 				}
-			}
-		case "private":
-			if config.Conf.Modules.EnablePrivateCommand && update.Message.IsCommand() {
-				service.NewCommandConfig(c).InPrivateCommands()
-				return
 			}
 		}
 	}
@@ -83,18 +81,18 @@ func Controller(ctx context.Context, cancel context.CancelFunc, bot *tgbotapi.Bo
 
 type asyncChannel chan *service.BotConfig
 
-var asyncMap = make(map[int64]asyncChannel)
+var asyncMap = sync.Map{}
 
-func asyncController(ch asyncChannel) {
+func asyncController(ctx context.Context, ch asyncChannel, chatID int64) {
 	var asyncControllerOnce sync.Once
 	for {
 		select {
 		case c := <-ch:
 			cc := service.NewChatConfig(c)
 			asyncControllerOnce.Do(func() {
-				go c.DeleteMessageCronHandler()
+				go c.DeleteMessageCronHandler(ctx)
 				if c.IsEnableChatService("clear_my_48h_message") {
-					go cc.Delete48hMessageCronHandler()
+					go cc.Delete48hMessageCronHandler(ctx)
 				}
 			})
 			if c.IsEnableChatService("chat_member_verify") {
@@ -115,6 +113,10 @@ func asyncController(ch asyncChannel) {
 			if c.IsEnableChatService("chat_user_activity") {
 				cc.ChatUserActivity()
 			}
+		case <-ctx.Done():
+			asyncMap.Delete(chatID)
+			logrus.Infof("async_controller exited:%v", chatID)
+			return
 		}
 	}
 }

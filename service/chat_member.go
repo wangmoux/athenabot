@@ -13,7 +13,7 @@ func (c *ChatConfig) NewChatMemberVerify() {
 		logrus.Infof("new_user:%v", user.ID)
 		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tgbotapi.ChatMemberConfig{
-				ChatID: c.update.Message.Chat.ID,
+				ChatID: c.chatID,
 				UserID: user.ID,
 			},
 		})
@@ -30,12 +30,12 @@ func (c *ChatConfig) NewChatMemberVerify() {
 					Type:   "text_link",
 					Offset: 5 + width,
 					Length: 2,
-					URL:    util.StrBuilder("https://t.me/", c.bot.Self.UserName, "?start=verify_", util.NumToStr(c.update.Message.Chat.ID)),
+					URL:    util.StrBuilder("https://t.me/", c.bot.Self.UserName, "?start=verify_", util.NumToStr(c.chatID)),
 				},
 			}
 			c.messageConfig.Text = util.StrBuilder("欢迎 ", c.update.Message.From.FirstName, " 【点我】 完成验证就可以说话了")
-			c.sendMessage()
-			chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.update.Message.From.ID))
+			c.sendCommandMessage()
+			chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(c.chatID), ":", util.NumToStr(c.update.Message.From.ID))
 			err := db.RDB.Set(c.ctx, chatVerifyKey, c.update.Message.Chat.UserName, time.Second*3600).Err()
 			if err != nil {
 				logrus.Error(err)
@@ -85,7 +85,7 @@ func (c *ChatConfig) chatMemberVerify(chatID int64) {
 				},
 			}
 			c.messageConfig.Text = "你可以说话了【点我】进群"
-			c.sendMessage()
+			c.sendCommandMessage()
 			err := db.RDB.Del(c.ctx, chatVerifyKey).Err()
 			if err != nil {
 				logrus.Error(err)

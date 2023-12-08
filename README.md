@@ -1,16 +1,13 @@
-# Athena BOT
+# AthenaBot Project
 
-## config example
-conf/example-config.json
+## Deploy your own bot
 
-## deploy
-
-```bash
-docker run --restart always --name redis -v /data/redis:/data -d redis:5
+```shell
+docker run --name redis -v /data/redis:/data -d redis:5
 
 docker build -t="athenabot:latest" .
 
-docker run --restart always --name athenabot \
+docker run --name athenabot \
 -e BOT_CONFIG="./config.json" \
 -d athenabot:latest
 ```

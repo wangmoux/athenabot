@@ -1,6 +1,7 @@
 package model
 
 import (
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"sync"
 	"time"
 )
@@ -31,4 +32,24 @@ var ImageDocPool = &sync.Pool{
 	New: func() any {
 		return new(ImageDoc)
 	},
+}
+
+type UpdateType string
+type ChatType string
+
+const (
+	MessageType    = "message"
+	InlineType     = "inline"
+	CallbackType   = "callback"
+	PrivateType    = "private"
+	GroupType      = "group"
+	SupergroupType = "supergroup"
+	ChannelType    = "channel"
+)
+
+type UpdateConfig struct {
+	tgbotapi.Update
+	ChatID     int64
+	UpdateType string
+	ChatType   string
 }

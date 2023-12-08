@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"math/big"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 )
 
@@ -32,11 +32,11 @@ func (c *CommandConfig) studyCommand() {
 
 	if c.isLimitCommand(3) {
 		c.messageConfig.Text = "你学的太多了休息一下"
-		c.sendMessage()
+		c.sendCommandMessage()
 		return
 	}
 
-	studyTopKey := util.StrBuilder(studyTopKeyDir, util.NumToStr(c.update.Message.Chat.ID))
+	studyTopKey := util.StrBuilder(studyTopKeyDir, util.NumToStr(c.chatID))
 	users, err := db.RDB.ZRange(c.ctx, studyTopKey, -3, -1).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -45,7 +45,7 @@ func (c *CommandConfig) studyCommand() {
 		if userID == util.NumToStr(c.update.Message.From.ID) {
 			if c.isLimitCommand(1) {
 				c.messageConfig.Text = "你成绩太优秀了休息一下"
-				c.sendMessage()
+				c.sendCommandMessage()
 				return
 			}
 		}
@@ -62,7 +62,7 @@ func (c *CommandConfig) studyCommand() {
 	}
 	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: c.handleUserID,
 		},
 		UntilDate: rtTime*60 + nowTimestamp,
@@ -76,7 +76,7 @@ func (c *CommandConfig) studyCommand() {
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
 		c.messageConfig.Text = util.StrBuilder("好学生 ", c.handleUserName, " 恭喜获得学习时间", util.NumToStr(rtTime), "分钟")
-		c.sendMessage()
+		c.sendCommandMessage()
 		t := newTopConfig(c.BotConfig)
 		t.setTop(studyTopKeyDir, c.handleUserID, float64(rtTime))
 		c.commandLimitAdd(1)
@@ -88,13 +88,14 @@ func (c *CommandConfig) studyCommand() {
 func (c *CommandConfig) banCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
 
 	req, err := c.bot.Request(tgbotapi.BanChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: c.handleUserID,
 		},
 	})
@@ -107,7 +108,7 @@ func (c *CommandConfig) banCommand() {
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已经被干掉了")
-		c.sendMessage()
+		c.sendCommandMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
 	}
@@ -116,18 +117,19 @@ func (c *CommandConfig) banCommand() {
 func (c *CommandConfig) dbanCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
 	req, err := c.bot.Request(tgbotapi.BanChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: c.handleUserID,
 		},
 		RevokeMessages: true,
 	})
 	if c.IsEnableChatService("clear_my_48h_message") {
-		chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
+		chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.chatID), ":", util.NumToStr(c.handleUserID))
 		messageIDs, err := db.RDB.HGetAll(c.ctx, chat48hMessageKey).Result()
 		if err != nil {
 			logrus.Error(err)
@@ -150,9 +152,9 @@ func (c *CommandConfig) dbanCommand() {
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已经消失的无影无踪")
-		c.sendMessage()
+		c.sendCommandMessage()
 		req, err := c.bot.Request(tgbotapi.DeleteMessageConfig{
-			ChatID:    c.update.Message.Chat.ID,
+			ChatID:    c.chatID,
 			MessageID: c.update.Message.ReplyToMessage.MessageID,
 		})
 		if !req.Ok {
@@ -166,13 +168,14 @@ func (c *CommandConfig) dbanCommand() {
 func (c *CommandConfig) unBanCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
 
 	req, err := c.bot.Request(tgbotapi.UnbanChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: c.handleUserID,
 		},
 		OnlyIfBanned: true,
@@ -180,7 +183,7 @@ func (c *CommandConfig) unBanCommand() {
 	if req.Ok {
 		logrus.Infof("handle_user:%v", c.handleUserID)
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 获得救赎")
-		c.sendMessage()
+		c.sendCommandMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
 	}
@@ -189,6 +192,7 @@ func (c *CommandConfig) unBanCommand() {
 func (c *CommandConfig) rtCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
@@ -203,7 +207,7 @@ func (c *CommandConfig) rtCommand() {
 	}
 	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: c.handleUserID,
 		},
 		UntilDate: rtTime*60 + nowTimestamp,
@@ -217,7 +221,7 @@ func (c *CommandConfig) rtCommand() {
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 你需要休息", util.NumToStr(rtTime), "分钟")
-		c.sendMessage()
+		c.sendCommandMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
 	}
@@ -226,12 +230,13 @@ func (c *CommandConfig) rtCommand() {
 func (c *CommandConfig) unRtCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
 	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 		ChatMemberConfig: tgbotapi.ChatMemberConfig{
-			ChatID: c.update.Message.Chat.ID,
+			ChatID: c.chatID,
 			UserID: c.handleUserID,
 		},
 		Permissions: &tgbotapi.ChatPermissions{
@@ -254,7 +259,7 @@ func (c *CommandConfig) unRtCommand() {
 			User:   &tgbotapi.User{ID: c.handleUserID},
 		}}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 可以说话了")
-		c.sendMessage()
+		c.sendCommandMessage()
 	} else {
 		logrus.Errorln(req.ErrorCode, err)
 	}
@@ -263,10 +268,11 @@ func (c *CommandConfig) unRtCommand() {
 func (c *CommandConfig) warnCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
-	warnKey := util.StrBuilder(warnKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
+	warnKey := util.StrBuilder(warnKeyDir, util.NumToStr(c.chatID), ":", util.NumToStr(c.handleUserID))
 	res, err := db.RDB.Exists(c.ctx, warnKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -307,16 +313,17 @@ func (c *CommandConfig) warnCommand() {
 		User:   &tgbotapi.User{ID: c.handleUserID},
 	}}
 	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 移除警告 ", strconv.Itoa(count), "/3")
-	c.sendMessage()
+	c.sendCommandMessage()
 }
 
 func (c *CommandConfig) unWarnCommand() {
 	c.mustAdmin = true
 	c.mustReply = true
+	c.mustAdminCanRestrictMembers = true
 	if !c.isApproveCommandRule() {
 		return
 	}
-	warnKey := util.StrBuilder(warnKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.handleUserID))
+	warnKey := util.StrBuilder(warnKeyDir, util.NumToStr(c.chatID), ":", util.NumToStr(c.handleUserID))
 	res, err := db.RDB.Exists(c.ctx, warnKey).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -351,7 +358,7 @@ func (c *CommandConfig) unWarnCommand() {
 		User:   &tgbotapi.User{ID: c.handleUserID},
 	}}
 	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 警告已经移除 ", strconv.Itoa(count), "/3")
-	c.sendMessage()
+	c.sendCommandMessage()
 }
 
 func (c *CommandConfig) enableCommand() {
@@ -360,38 +367,17 @@ func (c *CommandConfig) enableCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
-	switch c.commandArg {
-	case "all":
-		var commands string
-		for command := range config.CommandsMap {
-			if command == "disable" || command == "enable" {
-				continue
-			}
-			err := db.RDB.Del(c.ctx, commandSwitchKey+command).Err()
-			if err != nil {
-				logrus.Error(err)
-			}
-			commands += util.StrBuilder("/", command, "\n")
-			logrus.Infof("enable_command:%v", command)
-		}
-		c.messageConfig.Text = util.StrBuilder(commands, " 命令已启用")
-		c.sendMessage()
-	default:
-		if c.commandArg == "disable" || c.commandArg == "enable" {
-			return
-		}
-		if _, ok := config.CommandsMap[c.commandArg]; !ok {
-			return
-		}
-		err := db.RDB.Del(c.ctx, commandSwitchKey+c.commandArg).Err()
-		if err != nil {
-			logrus.Error(err)
-		}
-		logrus.Infof("enable_command:%v", c.commandArg)
-		c.messageConfig.Text = util.StrBuilder(c.commandArg, "\n命令已启用")
-		c.sendMessage()
+	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.chatID), ":disable_")
+	if _, ok := commandsGroupFunc[c.commandArg]; !ok {
+		return
 	}
+	err := db.RDB.Del(c.ctx, commandSwitchKey+c.commandArg).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+	logrus.Infof("enable_command:%v", c.commandArg)
+	c.messageConfig.Text = util.StrBuilder(c.commandArg, "\n命令已启用")
+	c.sendCommandMessage()
 }
 
 func (c *CommandConfig) disableCommand() {
@@ -400,38 +386,17 @@ func (c *CommandConfig) disableCommand() {
 	if !c.isApproveCommandRule() {
 		return
 	}
-	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.update.Message.Chat.ID), ":disable_")
-	switch c.commandArg {
-	case "all":
-		var commands string
-		for command := range config.CommandsMap {
-			if command == "disable" || command == "enable" {
-				continue
-			}
-			err := db.RDB.Set(c.ctx, commandSwitchKey+command, 0, 0).Err()
-			if err != nil {
-				logrus.Error(err)
-			}
-			commands += util.StrBuilder("/", command, "\n")
-			logrus.Infof("disable_command:%v", command)
-		}
-		c.messageConfig.Text = util.StrBuilder(commands, "\n命令已禁用")
-		c.sendMessage()
-	default:
-		if c.commandArg == "disable" || c.commandArg == "enable" {
-			return
-		}
-		if _, ok := config.CommandsMap[c.commandArg]; !ok {
-			return
-		}
-		err := db.RDB.Set(c.ctx, commandSwitchKey+c.commandArg, 0, 0).Err()
-		if err != nil {
-			logrus.Error(err)
-		}
-		logrus.Infof("disable_command:%v", c.commandArg)
-		c.messageConfig.Text = util.StrBuilder(c.commandArg, " 命令已禁用")
-		c.sendMessage()
+	commandSwitchKey := util.StrBuilder(serviceSwitchKeyDir, util.NumToStr(c.chatID), ":disable_")
+	if _, ok := commandsGroupFunc[c.commandArg]; !ok {
+		return
 	}
+	err := db.RDB.Set(c.ctx, commandSwitchKey+c.commandArg, 0, 0).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+	logrus.Infof("disable_command:%v", c.commandArg)
+	c.messageConfig.Text = util.StrBuilder(c.commandArg, " 命令已禁用")
+	c.sendCommandMessage()
 }
 
 func (c *CommandConfig) doudouCommand() {
@@ -441,6 +406,16 @@ func (c *CommandConfig) doudouCommand() {
 	c.canHandleAdminReply = true
 	if !c.isApproveCommandRule() {
 		return
+	}
+
+	var isHandleUserToOwner bool
+	var isCommandUserFromOwner bool
+	if c.handleUserID == config.Conf.OwnerID {
+		isHandleUserToOwner = true
+	}
+
+	if c.update.Message.From.ID == config.Conf.OwnerID {
+		isCommandUserFromOwner = true
 	}
 
 	rtTimestamp := time.Now().Unix()
@@ -460,7 +435,7 @@ func (c *CommandConfig) doudouCommand() {
 				User:   &tgbotapi.User{ID: c.handleUserID},
 			}}
 			c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已经被打倒不用在斗了")
-			c.sendMessage()
+			c.sendCommandMessage()
 			return
 		}
 	}
@@ -468,35 +443,43 @@ func (c *CommandConfig) doudouCommand() {
 	if c.userIsAdmin {
 		limit = 5
 	}
-	if c.isLimitCommand(limit) {
+	heiWuLeiKey := util.StrBuilder(heiWuLeiDir, util.NumToStr(c.chatID))
+	isHandleUserToHwl, err := db.RDB.SIsMember(c.ctx, heiWuLeiKey, c.handleUserID).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	isCommandUserFromHwl, err := db.RDB.SIsMember(c.ctx, heiWuLeiKey, c.update.Message.From.ID).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	if isHandleUserToHwl {
+		limit = 10
+	}
+
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.update.Message.From.FirstName),
+		User:   &tgbotapi.User{ID: c.update.Message.From.ID},
+	}}
+
+	if c.isLimitCommand(limit) && !isCommandUserFromOwner {
 		if c.userIsAdmin {
-			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-				Type:   "text_mention",
-				Offset: 0,
-				Length: util.TGNameWidth(c.update.Message.From.FirstName),
-				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
-			}}
 			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 斗斗扩大化 检讨3分钟（实际不执行）")
-			c.sendMessage()
+			c.sendCommandMessage()
 		} else {
 			rtTimestamp += 180
 			req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 				ChatMemberConfig: tgbotapi.ChatMemberConfig{
-					ChatID: c.update.Message.Chat.ID,
+					ChatID: c.chatID,
 					UserID: c.update.Message.From.ID,
 				},
 				UntilDate: rtTimestamp,
 			})
 			if req.Ok {
 				logrus.Infof("handle_user:%v rt_time:%v", c.update.Message.From.ID, 3)
-				c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-					Type:   "text_mention",
-					Offset: 0,
-					Length: util.TGNameWidth(c.update.Message.From.FirstName),
-					User:   &tgbotapi.User{ID: c.update.Message.From.ID},
-				}}
 				c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 斗斗扩大化 检讨3分钟")
-				c.sendMessage()
+				c.sendCommandMessage()
 			} else {
 				logrus.Errorln(req.ErrorCode, err)
 			}
@@ -505,63 +488,63 @@ func (c *CommandConfig) doudouCommand() {
 	}
 
 	doudouOdds, _ := rand.Int(rand.Reader, big.NewInt(99))
-	if doudouOdds.Int64() < 5 && !c.userIsAdmin {
+	if isCommandUserFromHwl {
+		doudouOdds, _ = rand.Int(rand.Reader, big.NewInt(10))
+	}
+	if doudouOdds.Int64() < 5 && !c.userIsAdmin && !isCommandUserFromOwner && !isHandleUserToHwl {
 		rtTimestamp += 180
 		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
 			ChatMemberConfig: tgbotapi.ChatMemberConfig{
-				ChatID: c.update.Message.Chat.ID,
+				ChatID: c.chatID,
 				UserID: c.update.Message.From.ID,
 			},
 			UntilDate: rtTimestamp,
 		})
 		if req.Ok {
 			logrus.Infof("handle_user:%v rt_time:%v", c.update.Message.From.ID, 3)
-			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-				Type:   "text_mention",
-				Offset: 0,
-				Length: util.TGNameWidth(c.update.Message.From.FirstName),
-				User:   &tgbotapi.User{ID: c.update.Message.From.ID},
-			}}
 			c.messageConfig.Text = util.StrBuilder(c.update.Message.From.FirstName, " 诬陷群友 检讨3分钟")
-			c.sendMessage()
+			c.sendCommandMessage()
 		} else {
 			logrus.Errorln(req.ErrorCode, err)
 		}
 		return
 	}
 
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+
 	if c.replyUserIsAdmin {
-		c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-			Type:   "text_mention",
-			Offset: 0,
-			Length: util.TGNameWidth(c.handleUserName),
-			User:   &tgbotapi.User{ID: c.handleUserID},
-		}}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 属于群内部矛盾 诫勉谈话一次")
-		c.sendMessage()
+		c.sendCommandMessage()
 	} else {
 		randTime, _ := rand.Int(rand.Reader, big.NewInt(3))
 		rtMin := randTime.Int64() + 1
+		if isHandleUserToHwl {
+			rtMin = 3
+		}
 		rtTimestamp += rtMin * 60
-		req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
-			ChatMemberConfig: tgbotapi.ChatMemberConfig{
-				ChatID: c.update.Message.Chat.ID,
-				UserID: c.handleUserID,
-			},
-			UntilDate: rtTimestamp,
-		})
-		if req.Ok {
-			logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtMin)
-			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
-				Type:   "text_mention",
-				Offset: 0,
-				Length: util.TGNameWidth(c.handleUserName),
-				User:   &tgbotapi.User{ID: c.handleUserID},
-			}}
+		logrus.Infof("handle_user:%v rt_time:%v", c.handleUserID, rtMin)
+		if isHandleUserToOwner {
 			c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtMin), "分钟")
-			c.sendMessage()
+			c.sendCommandMessage()
 		} else {
-			logrus.Errorln(req.ErrorCode, err)
+			req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
+				ChatMemberConfig: tgbotapi.ChatMemberConfig{
+					ChatID: c.chatID,
+					UserID: c.handleUserID,
+				},
+				UntilDate: rtTimestamp,
+			})
+			if req.Ok {
+				c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 对群不忠诚 检讨", util.NumToStr(rtMin), "分钟")
+				c.sendCommandMessage()
+			} else {
+				logrus.Errorln(req.ErrorCode, err)
+			}
 		}
 	}
 	c.commandLimitAdd(1)
@@ -594,12 +577,12 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 
 	if c.isLimitCommand(2) {
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 本来无一物 何处惹尘埃")
-		c.sendMessage()
+		c.sendCommandMessage()
 		return
 	}
 
 	logrus.Infof("handle_user:%v", c.handleUserID)
-	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.update.Message.Chat.ID))
+	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.chatID))
 	switch c.commandArg {
 	case "enable_cron":
 		err := db.RDB.SAdd(c.ctx, chat48hMessageDeleteCrontabKey, c.handleUserID).Err()
@@ -607,7 +590,7 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 			logrus.Error(err)
 		}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图计划已开启，你在本群的消息将会自动图图")
-		c.sendMessage()
+		c.sendCommandMessage()
 		return
 	case "disable_cron":
 		err := db.RDB.SRem(c.ctx, chat48hMessageDeleteCrontabKey, c.handleUserID).Err()
@@ -615,7 +598,7 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 			logrus.Warn(err)
 		}
 		c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 图图计划已禁用")
-		c.sendMessage()
+		c.sendCommandMessage()
 		return
 	default:
 		c.commandLimitAdd(1)
@@ -626,7 +609,7 @@ func (c *CommandConfig) clearMy48hMessageCommand() {
 			[]tgbotapi.InlineKeyboardButton{confirmButton},
 		)
 		c.messageConfig.ReplyMarkup = replyMarkup
-		c.sendMessage()
+		c.sendCommandMessage()
 	}
 }
 
@@ -637,7 +620,7 @@ func (c *CommandConfig) honorTopCommand() {
 }
 
 func (c *CommandConfig) chatBlacklistCommand() {
-	key := util.StrBuilder(chatBlacklistDir, util.NumToStr(c.update.Message.Chat.ID))
+	key := util.StrBuilder(chatBlacklistDir, util.NumToStr(c.chatID))
 	if len(c.commandArg) == 0 {
 		keywords, err := db.RDB.ZRevRange(c.ctx, key, 0, -1).Result()
 		if err != nil {
@@ -648,7 +631,7 @@ func (c *CommandConfig) chatBlacklistCommand() {
 			text += util.StrBuilder(keyword, "\n")
 		}
 		c.messageConfig.Text = text
-		c.sendMessage()
+		c.sendCommandMessage()
 	}
 	if len(c.commandArg) > 2 {
 		c.mustAdmin = true
@@ -660,7 +643,7 @@ func (c *CommandConfig) chatBlacklistCommand() {
 			card, _ := db.RDB.ZCard(c.ctx, key).Result()
 			if card >= 100 {
 				c.messageConfig.Text = "黑名单不能超过100个"
-				c.sendMessage()
+				c.sendCommandMessage()
 				return
 			}
 			err := db.RDB.ZAdd(c.ctx, key, &redis.Z{
@@ -703,7 +686,7 @@ func (c *CommandConfig) chatUserActivityCommand() {
 		)
 		c.messageConfig.ReplyMarkup = replyMarkup
 		c.messageConfig.Text = util.StrBuilder(util.NumToStr(inactiveDays), " 天不活跃群友将会被图图\n")
-		c.sendMessage()
+		c.sendCommandMessage()
 		c.commandLimitAdd(1)
 		return
 	}
@@ -716,31 +699,23 @@ func (c *CommandConfig) chatUserActivityCommand() {
 
 	var msg string
 	for _, data := range chatUserActivityData {
+		if data.inactiveDays == 0 {
+			msg += util.StrBuilder(data.fullName, " ", "活跃中\n")
+			continue
+		}
 		msg += util.StrBuilder(data.fullName, " ", util.NumToStr(data.inactiveDays), "天 未活跃\n")
 	}
 
 	c.messageConfig.Text = msg
-	c.sendMessage()
+	c.sendCommandMessage()
 }
 
 func (c *CommandConfig) botShareholdersCommand() {
-	shareholdersKey := util.StrBuilder(shareholdersDir, "shareholders")
+	shareholdersKey := util.StrBuilder(shareholdersDir, util.NumToStr(c.bot.Self.ID))
 	shareholdersData, err := db.RDB.HGetAll(c.ctx, shareholdersKey).Result()
 	if err != nil {
 		logrus.Error(err)
 		return
-	}
-	wg := new(sync.WaitGroup)
-	userCache := &userNameCache{
-		userName: make(map[int64]string),
-	}
-	for id, _ := range shareholdersData {
-		wg.Add(1)
-		userID, err := strconv.ParseInt(id, 10, 64)
-		if err != nil {
-			continue
-		}
-		c.getUserNameCache(wg, userID, userCache)
 	}
 	c.messageConfig.Text = "本BOT股东成员（排名不分先后）\n"
 	for id, title := range shareholdersData {
@@ -748,16 +723,13 @@ func (c *CommandConfig) botShareholdersCommand() {
 		if err != nil {
 			continue
 		}
-		name, ok := userCache.userName[userID]
-		if ok {
-			c.messageConfig.Text += util.StrBuilder(name, " ", title, "\n")
-		}
+		c.messageConfig.Text += util.StrBuilder(c.getUserCache(userID).User.FirstName, " ", title, "\n")
 	}
-	c.sendMessage()
+	c.sendCommandMessage()
 }
 
 func (c *CommandConfig) botBeShareholderCommand() {
-	shareholdersKey := util.StrBuilder(shareholdersDir, "shareholders")
+	shareholdersKey := util.StrBuilder(shareholdersDir, util.NumToStr(c.bot.Self.ID))
 	c.mustReply = true
 	c.canHandleSelf = true
 	c.canHandleNoAdminReply = true
@@ -767,7 +739,7 @@ func (c *CommandConfig) botBeShareholderCommand() {
 	}
 	if c.update.Message.From.ID != config.Conf.OwnerID {
 		c.messageConfig.Text = "你不是董事长，无权邀请董事会成员"
-		c.sendMessage()
+		c.sendCommandMessage()
 		return
 	}
 	err := db.RDB.HSet(c.ctx, shareholdersKey, c.handleUserID, c.commandArg).Err()
@@ -785,5 +757,76 @@ func (c *CommandConfig) botBeShareholderCommand() {
 	c.botMessageCleanCountdown = 0
 	c.commandMessageCleanCountdown = 0
 	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 加入董事会，职位为", c.commandArg)
-	c.sendMessage()
+	c.sendCommandMessage()
+}
+
+func (c *CommandConfig) heiWuLeiCommand() {
+	c.mustReply = true
+	c.mustAdmin = true
+	c.mustAdminCanRestrictMembers = true
+	if !c.isApproveCommandRule() {
+		return
+	}
+	heiWuLeiKey := util.StrBuilder(heiWuLeiDir, util.NumToStr(c.chatID))
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+	err := db.RDB.SAdd(c.ctx, heiWuLeiKey, c.handleUserID).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 踏上千万只脚")
+	c.sendCommandMessage()
+}
+
+func (c *CommandConfig) pingFanCommand() {
+	c.mustReply = true
+	c.mustAdmin = true
+	c.mustAdminCanRestrictMembers = true
+	if !c.isApproveCommandRule() {
+		return
+	}
+	heiWuLeiKey := util.StrBuilder(heiWuLeiDir, util.NumToStr(c.chatID))
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(c.handleUserName),
+		User:   &tgbotapi.User{ID: c.handleUserID},
+	}}
+	isHwl, err := db.RDB.SIsMember(c.ctx, heiWuLeiKey, c.handleUserID).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	if !isHwl {
+		return
+	}
+	err = db.RDB.SRem(c.ctx, heiWuLeiKey, c.handleUserID).Err()
+	if err != nil {
+		logrus.Error(err)
+	}
+	c.messageConfig.Text = util.StrBuilder(c.handleUserName, " 已被平反，你受委屈了，有困难跟群里提")
+	c.sendCommandMessage()
+}
+
+func (c *CommandConfig) powerCommand() {
+	arg := c.commandArg
+	if c.update.Message.From.ID != config.Conf.OwnerID {
+		return
+	}
+	c.userIsAdmin = true
+	c.userIsRestrictAdmin = true
+	if len(arg) > 0 {
+		args := strings.Split(arg, ",")
+		if len(args) == 2 {
+			c.commandArg = args[1]
+		} else {
+			c.commandArg = ""
+		}
+		if f, ok := commandsGroupFunc[args[0]]; ok {
+			f(c)
+		}
+	}
 }

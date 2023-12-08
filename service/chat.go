@@ -32,13 +32,13 @@ func (c *ChatConfig) ChatLimit() {
 		return
 	}
 	timestamp := time.Now().Unix()
-	if group, ok := groupsChatLimit[c.update.Message.Chat.ID]; ok {
+	if group, ok := groupsChatLimit[c.chatID]; ok {
 		if group.userID == c.update.Message.From.ID {
 			group.count += 1
 			if group.count >= 10 {
 				if timestamp-group.timestamp < 30 {
 					c.messageConfig.Text = "多吃饭少说话"
-					c.sendMessage()
+					c.sendCommandMessage()
 					logrus.Infof("chat_limit:%+v", group)
 				}
 				group.timestamp = timestamp
@@ -46,7 +46,7 @@ func (c *ChatConfig) ChatLimit() {
 			return
 		}
 	}
-	groupsChatLimit[c.update.Message.Chat.ID] = &chatLimit{
+	groupsChatLimit[c.chatID] = &chatLimit{
 		userID:    c.update.Message.From.ID,
 		count:     1,
 		timestamp: timestamp,
@@ -55,7 +55,7 @@ func (c *ChatConfig) ChatLimit() {
 }
 
 func (c *ChatConfig) ChatStore48hMessage() {
-	chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", util.NumToStr(c.update.Message.From.ID))
+	chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.chatID), ":", util.NumToStr(c.update.Message.From.ID))
 	err := db.RDB.HMSet(c.ctx, chat48hMessageKey, c.update.Message.MessageID, time.Now().Unix()).Err()
 	if err != nil {
 		logrus.Error(err)
@@ -66,48 +66,54 @@ func (c *ChatConfig) ChatStore48hMessage() {
 	}
 }
 
-func (c *ChatConfig) Delete48hMessageCronHandler() {
-	logrus.Infof("new delete_48h_message_cron_handler:%v", c.update.Message.Chat.ID)
-	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.update.Message.Chat.ID))
+func (c *ChatConfig) Delete48hMessageCronHandler(ctx context.Context) {
+	logrus.Infof("new delete_48h_message_cron_handler:%v", c.chatID)
+	chat48hMessageDeleteCrontabKey := util.StrBuilder(chat48hMessageDeleteCrontabDir, util.NumToStr(c.chatID))
 	ticker := time.NewTicker(time.Second * 600)
-	for range ticker.C {
-		crontabUsers, err := db.RDB.SMembers(context.Background(), chat48hMessageDeleteCrontabKey).Result()
-		if err != nil {
-			logrus.Error(err)
-		}
-		for _, userID := range crontabUsers {
-			chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.update.Message.Chat.ID), ":", userID)
-			isMessageIDs, err := db.RDB.Exists(context.Background(), chat48hMessageKey).Result()
+	for {
+		select {
+		case <-ticker.C:
+			crontabUsers, err := db.RDB.SMembers(context.Background(), chat48hMessageDeleteCrontabKey).Result()
 			if err != nil {
 				logrus.Error(err)
-				continue
 			}
-			if isMessageIDs > 0 {
-				messageIDs, err := db.RDB.HGetAll(context.Background(), chat48hMessageKey).Result()
+			for _, userID := range crontabUsers {
+				chat48hMessageKey := util.StrBuilder(chat48hMessageDir, util.NumToStr(c.chatID), ":", userID)
+				isMessageIDs, err := db.RDB.Exists(context.Background(), chat48hMessageKey).Result()
 				if err != nil {
 					logrus.Error(err)
 					continue
 				}
-				for k, v := range messageIDs {
-					messageID, err := strconv.Atoi(k)
-					if err != nil {
-						continue
-					}
-					messageTime, err := strconv.Atoi(v)
-					if err != nil {
-						continue
-					}
-					t := time.Now().Unix() - int64(messageTime)
-					if t > 172800 || t < 169200 {
-						continue
-					}
-					c.addDeleteMessageQueue(0, messageID)
-					err = db.RDB.HDel(context.Background(), chat48hMessageKey, util.NumToStr(messageID)).Err()
+				if isMessageIDs > 0 {
+					messageIDs, err := db.RDB.HGetAll(context.Background(), chat48hMessageKey).Result()
 					if err != nil {
 						logrus.Error(err)
+						continue
+					}
+					for k, v := range messageIDs {
+						messageID, err := strconv.Atoi(k)
+						if err != nil {
+							continue
+						}
+						messageTime, err := strconv.Atoi(v)
+						if err != nil {
+							continue
+						}
+						t := time.Now().Unix() - int64(messageTime)
+						if t > 172800 || t < 169200 {
+							continue
+						}
+						c.addDeleteMessageQueue(0, messageID)
+						err = db.RDB.HDel(context.Background(), chat48hMessageKey, util.NumToStr(messageID)).Err()
+						if err != nil {
+							logrus.Error(err)
+						}
 					}
 				}
 			}
+		case <-ctx.Done():
+			logrus.Infof("delete_48h_message_cron_handler exited:%v", c.chatID)
+			return
 		}
 	}
 }
@@ -124,7 +130,7 @@ func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string
 		}
 		if latestName[0] != currentName {
 			c.messageConfig.Text = util.StrBuilder(prefix, " ", latestName[0], " -> ", currentName)
-			c.sendMessage()
+			c.sendCommandMessage()
 			err = db.RDB.ZAdd(c.ctx, key, &redis.Z{
 				Score:  float64(time.Now().Unix()),
 				Member: currentName,
@@ -150,7 +156,7 @@ func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string
 }
 
 func (c *ChatConfig) ChatUserprofileWatch() {
-	usernameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.update.Message.Chat.ID), ":",
+	usernameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.chatID), ":",
 		util.NumToStr(c.update.Message.From.ID), ":", "username")
 	currentUsername := c.update.Message.From.UserName
 	if len(currentUsername) == 0 {
@@ -158,7 +164,7 @@ func (c *ChatConfig) ChatUserprofileWatch() {
 	}
 	c.chatUserprofileWatchHandler(usernameKey, currentUsername, "用户名已更改")
 
-	fullNameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.update.Message.Chat.ID), ":",
+	fullNameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.chatID), ":",
 		util.NumToStr(c.update.Message.From.ID), ":", "full_name")
 	currentFullName := c.update.Message.From.FirstName + c.update.Message.From.LastName
 	c.chatUserprofileWatchHandler(fullNameKey, currentFullName, "昵称已更改")
@@ -168,7 +174,7 @@ func (c *ChatConfig) ChatBlacklistHandler() {
 	if c.update.Message.IsCommand() && c.isAdmin(c.update.Message.From.ID) {
 		return
 	}
-	key := util.StrBuilder(chatBlacklistDir, util.NumToStr(c.update.Message.Chat.ID))
+	key := util.StrBuilder(chatBlacklistDir, util.NumToStr(c.chatID))
 	keywords, err := db.RDB.ZRevRange(context.Background(), key, 0, -1).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -183,14 +189,14 @@ func (c *ChatConfig) ChatBlacklistHandler() {
 	for _, keyword := range keywords {
 		if strings.Contains(text, keyword) {
 			c.messageConfig.Text = "你的发言涉嫌违反群规"
-			c.sendMessage()
+			c.sendCommandMessage()
 			break
 		}
 	}
 }
 
 func (c *ChatConfig) ChatUserActivity() {
-	key := util.StrBuilder(chatUserActivityDir, util.NumToStr(c.update.Message.Chat.ID))
+	key := util.StrBuilder(chatUserActivityDir, util.NumToStr(c.chatID))
 	z := &redis.Z{
 		Score:  float64(time.Now().Unix()),
 		Member: c.update.Message.From.ID,

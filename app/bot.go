@@ -3,16 +3,19 @@ package app
 import (
 	"athenabot/config"
 	"athenabot/controller"
+	"athenabot/model"
 	"context"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
 func RunBot() {
 	bot, err := tgbotapi.NewBotAPI(config.Conf.BotToken)
 	if err != nil {
-		logrus.Panic(err)
+		logrus.Error(err)
+		RunBot()
 	}
 	bot.Debug = false
 	logrus.Infof("bot:%v", bot.Self.UserName)
@@ -28,34 +31,62 @@ func RunBot() {
 
 func updatesHandler(client Client) {
 	for update := range client.Channel() {
+		uc := &model.UpdateConfig{
+			Update: update,
+		}
+
+		if update.InlineQuery != nil {
+			uc.ChatID = update.InlineQuery.From.ID
+			uc.UpdateType = model.InlineType
+			uc.ChatType = update.InlineQuery.ChatType
+		}
+
 		if update.CallbackQuery != nil {
-			update.Message = update.CallbackQuery.Message
+			uc.ChatID = update.CallbackQuery.Message.Chat.ID
+			uc.UpdateType = model.CallbackType
+			uc.ChatType = update.CallbackQuery.Message.Chat.Type
 		}
+
 		if update.Message != nil {
-			if chatCh, ok := chatMap[update.Message.Chat.ID]; ok {
-				chatCh <- update
-				continue
-			}
-			logrus.Infof("new chat_handler:%v", update.Message.Chat.ID)
-			updateCh := make(chatChannel, 10)
-			chatMap[update.Message.Chat.ID] = updateCh
-			go chatHandler(updateCh, client.GetBot())
-			updateCh <- update
+			uc.ChatID = update.Message.Chat.ID
+			uc.UpdateType = model.MessageType
+			uc.ChatType = update.Message.Chat.Type
 		}
+
+		if chatCh, ok := chatMap.Load(uc.ChatID); ok {
+			chatCh.(chatChannel) <- uc
+			continue
+		}
+		logrus.Infof("new chat_handler:%v", uc.ChatID)
+		updateCh := make(chatChannel, 10)
+		chatMap.Store(uc.ChatID, updateCh)
+
+		timeout := time.Hour * 48
+		if uc.ChatType == model.PrivateType || len(uc.UpdateType) == 0 {
+			timeout = time.Second * 60
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		go chatHandler(ctx, cancel, updateCh, client.GetBot(), uc.ChatID, timeout)
+		updateCh <- uc
 	}
 }
 
-var chatMap = make(map[int64]chatChannel)
+var chatMap sync.Map
 
-type chatChannel chan tgbotapi.Update
+type chatChannel chan *model.UpdateConfig
 
-func chatHandler(ch chatChannel, bot *tgbotapi.BotAPI) {
+func chatHandler(ctx context.Context, cancel context.CancelFunc, ch chatChannel, bot *tgbotapi.BotAPI, chatID int64, timeout time.Duration) {
+	doneTime := time.AfterFunc(timeout, cancel)
 	for {
 		select {
-		case update := <-ch:
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-			controller.Controller(ctx, cancel, bot, update)
+		case uc := <-ch:
+			controller.Controller(ctx, bot, uc)
+			doneTime.Reset(timeout)
 			//go debug(bot, update)
+		case <-ctx.Done():
+			chatMap.Delete(chatID)
+			logrus.Infof("chat_handler exited:%v", chatID)
+			return
 		}
 	}
 }

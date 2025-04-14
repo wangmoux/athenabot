@@ -335,11 +335,23 @@ func (c *BotConfig) IsGroupWhitelist(username string) bool {
 }
 
 func (c *BotConfig) IsMarsWhitelist(username string) bool {
-	if !config.Conf.MarsOCR.EnableWhitelist {
+	if !config.Conf.EnableMarsWhitelist {
 		return true
 	}
 	marsWhitelistKey := util.StrBuilder(marsWhitelistDir, util.NumToStr(c.bot.Self.ID))
 	isMember, err := db.RDB.SIsMember(c.ctx, marsWhitelistKey, username).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	return isMember
+}
+
+func (c *BotConfig) IsMarsOCRWhitelist(username string) bool {
+	if !config.Conf.EnableMarsWhitelist {
+		return true
+	}
+	marsOCRWhitelistKey := util.StrBuilder(marsOCRWhitelistDir, util.NumToStr(c.bot.Self.ID))
+	isMember, err := db.RDB.SIsMember(c.ctx, marsOCRWhitelistKey, username).Result()
 	if err != nil {
 		logrus.Error(err)
 	}

@@ -36,6 +36,10 @@ func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfi
 			cb.ClearMy48hMessage()
 		case "clear-users":
 			cb.ClearInactivityUsers()
+		case "delete-mars-msg":
+			cb.DeleteMarsMessage()
+		case "get-user-mars":
+			cb.GetUserMars()
 		}
 	case model.MessageType:
 		switch uc.ChatType {
@@ -57,16 +61,14 @@ func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfi
 					go asyncController(ctx, ch, uc.ChatID)
 					ch <- c
 				}()
-				if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") {
-					if c.IsMarsWhitelist(update.Message.Chat.UserName) {
-						if len(update.Message.Photo) > 0 {
-							service.NewMarsConfig(c).HandlePhoto()
-							return
-						}
-						if update.Message.Video != nil {
-							service.NewMarsConfig(c).HandleVideo()
-							return
-						}
+				if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") && c.IsMarsWhitelist(update.Message.Chat.UserName) {
+					if len(update.Message.Photo) > 0 {
+						service.NewMarsConfig(c).HandlePhoto()
+						return
+					}
+					if update.Message.Video != nil {
+						service.NewMarsConfig(c).HandleVideo()
+						return
 					}
 
 				}

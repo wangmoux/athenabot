@@ -6,6 +6,7 @@ import (
 	"athenabot/util"
 	"context"
 	"github.com/go-redis/redis/v8"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
@@ -118,7 +119,7 @@ func (c *ChatConfig) Delete48hMessageCronHandler(ctx context.Context) {
 	}
 }
 
-func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string) {
+func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string, userID int64) {
 	keyExists, err := db.RDB.Exists(c.ctx, key).Result()
 	if err != nil {
 		logrus.Error(err)
@@ -130,6 +131,12 @@ func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string
 		}
 		if latestName[0] != currentName {
 			c.messageConfig.Text = util.StrBuilder(prefix, " ", latestName[0], " -> ", currentName)
+			c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+				Type:   "text_mention",
+				Offset: 0,
+				Length: util.TGNameWidth(prefix),
+				User:   &tgbotapi.User{ID: userID},
+			}}
 			c.sendCommandMessage()
 			err = db.RDB.ZAdd(c.ctx, key, &redis.Z{
 				Score:  float64(time.Now().Unix()),
@@ -162,12 +169,12 @@ func (c *ChatConfig) ChatUserprofileWatch() {
 	if len(currentUsername) == 0 {
 		currentUsername = "unknown"
 	}
-	c.chatUserprofileWatchHandler(usernameKey, currentUsername, "用户名已更改")
+	c.chatUserprofileWatchHandler(usernameKey, currentUsername, "用户名更改", c.update.Message.From.ID)
 
 	fullNameKey := util.StrBuilder(chatUserprofileWatchDir, util.NumToStr(c.chatID), ":",
 		util.NumToStr(c.update.Message.From.ID), ":", "full_name")
 	currentFullName := c.update.Message.From.FirstName + c.update.Message.From.LastName
-	c.chatUserprofileWatchHandler(fullNameKey, currentFullName, "昵称已更改")
+	c.chatUserprofileWatchHandler(fullNameKey, currentFullName, "昵称更改", c.update.Message.From.ID)
 }
 
 func (c *ChatConfig) ChatBlacklistHandler() {

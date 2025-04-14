@@ -3,6 +3,7 @@ package service
 import (
 	"athenabot/db"
 	"athenabot/util"
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
 	"strconv"
@@ -24,7 +25,7 @@ func NewCallBack(botConfig *BotConfig, callbackData *CallbackData) *CallBack {
 func (c *CallBack) ClearMy48hMessage() {
 	if c.callbackData.UserID != c.update.CallbackQuery.From.ID {
 		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
-		msg.ShowAlert = true
+		//msg.ShowAlert = true
 		c.sendRequestMessage(msg)
 		return
 	}
@@ -69,7 +70,7 @@ func (c *CallBack) ClearMy48hMessage() {
 func (c *CallBack) ClearInactivityUsers() {
 	if !c.isAdminCanRestrictMembers(c.update.CallbackQuery.From.ID) {
 		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
-		msg.ShowAlert = true
+		//msg.ShowAlert = true
 		c.sendRequestMessage(msg)
 		return
 	}
@@ -103,5 +104,52 @@ func (c *CallBack) ClearInactivityUsers() {
 				logrus.Errorln(res, err)
 			}
 		}
+	}
+}
+
+func (c *CallBack) DeleteMarsMessage() {
+	if c.callbackData.UserID != c.update.CallbackQuery.From.ID {
+		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
+		c.sendRequestMessage(msg)
+		return
+	}
+	msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "嘘！")
+	c.sendRequestMessage(msg)
+	go func() {
+		time.Sleep(time.Second * 1)
+		marsMessageID := int(c.callbackData.Data.(float64))
+		_, _ = c.bot.Request(tgbotapi.DeleteMessageConfig{
+			ChatID:    c.chatID,
+			MessageID: marsMessageID,
+		})
+		_, _ = c.bot.Request(tgbotapi.DeleteMessageConfig{
+			ChatID:    c.chatID,
+			MessageID: c.update.CallbackQuery.Message.MessageID,
+		})
+	}()
+}
+
+func (c *CallBack) GetUserMars() {
+	//if c.callbackData.UserID != c.update.CallbackQuery.From.ID {
+	//	msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
+	//	c.sendRequestMessage(msg)
+	//	return
+	//}
+	key := util.StrBuilder(marsTopKeyDir, util.NumToStr(c.chatID))
+	userMars, err := db.RDB.ZScore(c.ctx, key, util.NumToStr(c.callbackData.UserID)).Result()
+	if err != nil {
+		return
+	}
+	if userMars > 0 {
+		if c.callbackData.UserID != c.update.CallbackQuery.From.ID {
+			if c.update.CallbackQuery.Message.ReplyToMessage != nil {
+				marsName := c.update.CallbackQuery.Message.ReplyToMessage.From.FirstName
+				msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, fmt.Sprintf("%s已经火星%d次了", marsName, int(userMars)))
+				c.sendRequestMessage(msg)
+			}
+			return
+		}
+		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, fmt.Sprintf("你已经火星%d次了", int(userMars)))
+		c.sendRequestMessage(msg)
 	}
 }

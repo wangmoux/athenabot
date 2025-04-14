@@ -68,14 +68,22 @@ func (c *MarsConfig) handleMars() {
 
 	humanChatID := c.chatID - c.chatID - c.chatID - 1000000000000
 	LatestMarsMessage := util.StrBuilder("https://t.me/c/", util.NumToStr(humanChatID), "/", util.NumToStr(c.latestMars.MsgID))
-	c.messageConfig.Text = util.StrBuilder("这条愚蠢的消息已经火星", util.NumToStr(c.currentMars.Count), "次了！！!")
+	c.messageConfig.Text = util.StrBuilder("这条消息火星", util.NumToStr(c.currentMars.Count), "次了哈")
 	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
 		Type:   "text_link",
 		URL:    LatestMarsMessage,
-		Offset: 9,
+		Offset: 6,
 		Length: 2,
 	},
 	}
+	delMarsCallbackData := generateCallbackData("delete-mars-msg", c.update.Message.From.ID, c.update.Message.MessageID)
+	getMarsCallbackData := generateCallbackData("get-user-mars", c.update.Message.From.ID, c.update.Message.MessageID)
+	delMarsConfirmButton := tgbotapi.NewInlineKeyboardButtonData("悄悄删掉", delMarsCallbackData)
+	getMarsConfirmButton := tgbotapi.NewInlineKeyboardButtonData("无动于衷", getMarsCallbackData)
+	replyMarkup := tgbotapi.NewInlineKeyboardMarkup(
+		[]tgbotapi.InlineKeyboardButton{delMarsConfirmButton, getMarsConfirmButton},
+	)
+	c.messageConfig.ReplyMarkup = replyMarkup
 	c.sendCommandMessage()
 	logrus.Infof("mars_user:%v mars_id:%v", c.update.Message.From.ID, c.marsID)
 	t := newTopConfig(c.BotConfig)
@@ -107,7 +115,7 @@ func (c *MarsConfig) HandlePhoto() {
 	if c.isMarsExists() {
 		c.handleMars()
 	} else {
-		if config.Conf.MarsOCR.EnableOCR && c.IsEnableChatService("chat_mars_ocr") {
+		if config.Conf.MarsOCR.EnableOCR && c.IsEnableChatService("chat_mars_ocr") && c.IsMarsOCRWhitelist(c.update.Message.Chat.UserName) {
 			imagePhrases, err := getImageOCR(bytes.NewBuffer(fileByte))
 			if err != nil {
 				logrus.Error(err)

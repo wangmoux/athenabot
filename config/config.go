@@ -26,7 +26,7 @@ type Webhook struct {
 
 type MarsOCR struct {
 	EnableOCR       bool    `json:"enable_ocr"`
-	EnableWhitelist bool    `json:"disable_whitelist"`
+	EnableWhitelist bool    `json:"enable_whitelist"`
 	DocURL          string  `json:"doc_url"`
 	DocProvider     string  `json:"doc_provider"`
 	OcrURL          string  `json:"ocr_url"`
@@ -42,6 +42,7 @@ type InlineQueryResultArticle struct {
 
 type Config struct {
 	EnableWhitelist           bool                       `json:"enable_whitelist"`
+	EnableMarsWhitelist       bool                       `json:"enable_mars_whitelist"`
 	RedisHost                 string                     `json:"redis_host"`
 	BotToken                  string                     `json:"bot_token"`
 	KeyTTL                    uint                       `json:"key_ttl"`

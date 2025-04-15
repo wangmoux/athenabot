@@ -61,6 +61,12 @@ func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfi
 					go asyncController(ctx, ch, uc.ChatID)
 					ch <- c
 				}()
+
+				if config.Conf.Modules.EnableCommand && c.IsCommand() {
+					service.NewCommandConfig(c).InCommands()
+					return
+				}
+
 				if config.Conf.Modules.EnableMars && c.IsEnableChatService("chat_mars") && c.IsMarsWhitelist(update.Message.Chat.UserName) {
 					if len(update.Message.Photo) > 0 {
 						service.NewMarsConfig(c).HandlePhoto()
@@ -70,11 +76,11 @@ func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfi
 						service.NewMarsConfig(c).HandleVideo()
 						return
 					}
+					if len(update.Message.Text) > 0 {
+						service.NewMarsConfig(c).HandleText()
+						return
+					}
 
-				}
-				if config.Conf.Modules.EnableCommand && c.IsCommand() {
-					service.NewCommandConfig(c).InCommands()
-					return
 				}
 			}
 		}

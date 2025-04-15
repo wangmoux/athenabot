@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/corona10/goimagehash"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/rivo/uniseg"
 	"image/jpeg"
 	"io"
@@ -13,12 +14,31 @@ import (
 	"strings"
 )
 
-func GetFileResponse(url string) (*http.Response, error) {
-	res, err := http.Get(url)
+func GetBotFile(bot *tgbotapi.BotAPI, fileID string, fileRange ...string) ([]byte, error) {
+	fileUrl, err := bot.GetFileDirectURL(fileID)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
-	return res, nil
+	req, err := http.NewRequest("GET", fileUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(fileRange) > 0 {
+		req.Header.Set("Range", fileRange[0])
+	}
+	hc := http.Client{}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }
 
 func GetFilePHash(body io.Reader) (uint64, error) {

@@ -368,5 +368,10 @@ func (c *BotConfig) IsCommand() bool {
 			return false
 		}
 	}
+	if c.update.Message.ViaBot != nil {
+		if c.update.Message.ViaBot.UserName != c.bot.Self.UserName {
+			return false
+		}
+	}
 	return true
 }

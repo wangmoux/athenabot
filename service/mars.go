@@ -7,10 +7,12 @@ import (
 	"athenabot/model"
 	"athenabot/util"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"time"
 )
 
@@ -42,6 +44,7 @@ func (c *MarsConfig) getMars() {
 func (c *MarsConfig) setMars() {
 	marsKey := util.StrBuilder(marsKeyDir, util.NumToStr(c.chatID), ":", c.marsID)
 	c.currentMars.MsgID = c.update.Message.MessageID
+	logrus.Infof("msg_id: %v mars_count: %v mars_id: %v", c.currentMars.MsgID, c.currentMars.Count, c.marsID)
 	marsJson, _ := json.Marshal(c.currentMars)
 	if err := db.RDB.Set(c.ctx, marsKey, marsJson, time.Second*time.Duration(config.Conf.KeyTTL)).Err(); err != nil {
 		logrus.Error(err)
@@ -92,25 +95,17 @@ func (c *MarsConfig) handleMars() {
 }
 
 func (c *MarsConfig) HandlePhoto() {
-	fileUrl, err := c.bot.GetFileDirectURL(c.update.Message.Photo[len(c.update.Message.Photo)-1].FileID)
+	fileByte, err := util.GetBotFile(c.bot, c.update.Message.Photo[len(c.update.Message.Photo)-1].FileID)
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
-	fileResponse, err := util.GetFileResponse(fileUrl)
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-	defer fileResponse.Body.Close()
-	fileByte, _ := ioutil.ReadAll(fileResponse.Body)
 	pHash, err := util.GetFilePHash(bytes.NewBuffer(fileByte))
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
-	c.marsID = util.NumToStr(pHash)
-	logrus.Infof("mars_id:%v", c.marsID)
+	c.marsID = util.StrBuilder("photo:phash:", util.NumToStr(pHash))
 
 	if c.isMarsExists() {
 		c.handleMars()
@@ -128,13 +123,64 @@ func (c *MarsConfig) HandlePhoto() {
 	}
 }
 
-func (c *MarsConfig) HandleVideo() {
-	c.marsID = c.update.Message.Video.FileUniqueID
+func (c *MarsConfig) handleVideoFileHash() {
+	var fileByte []byte
+	var err error
+	fileSize := c.update.Message.Video.FileSize
+	const kb = 64
+	if fileSize < 1024*kb+1 {
+		fileByte, err = util.GetBotFile(c.bot, c.update.Message.Video.FileID)
+	} else {
+		fileRange := fmt.Sprintf("bytes=%d-%d", fileSize-1024*kb, fileSize)
+		fileByte, err = util.GetBotFile(c.bot, c.update.Message.Video.FileID, fileRange)
+	}
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	var s []byte
+	s = append(s, util.NumToStr(fileSize)...)
+	s = append(s, fileByte...)
+	h := sha256.Sum256(s)
+	c.marsID = util.StrBuilder("video:end", util.NumToStr(kb), "k_sha256:", hex.EncodeToString(h[:]))
 	if c.isMarsExists() {
 		c.handleMars()
 	} else {
 		c.setMars()
 	}
+}
+
+func (c *MarsConfig) HandleVideo() {
+	//c.marsID = util.StrBuilder("video:file_unique_id:", c.update.Message.Video.FileUniqueID)
+	//if c.isMarsExists() {
+	//	c.handleMars()
+	//} else {
+	//	c.setMars()
+	//}
+	c.handleVideoFileHash()
+}
+
+func (c *MarsConfig) handleText(s string) {
+	h := sha256.Sum256([]byte(s))
+	c.marsID = util.StrBuilder("text:sha256:", hex.EncodeToString(h[:]))
+	if c.isMarsExists() {
+		c.handleMars()
+	} else {
+		c.setMars()
+	}
+}
+
+func (c *MarsConfig) HandleText() {
+	if c.update.Message.ForwardFromChat == nil {
+		return
+	}
+	if c.update.Message.ForwardFromChat.Type != "channel" {
+		return
+	}
+	if len(c.update.Message.Text) < 100 {
+		return
+	}
+	c.handleText(c.update.Message.Text)
 }
 
 func (c *MarsConfig) handleImageDoc(imagePhrases []string, pHash uint64) {

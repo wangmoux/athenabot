@@ -6,12 +6,13 @@ import (
 	"athenabot/util"
 	"context"
 	"encoding/json"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sirupsen/logrus"
 )
 
 type BotConfig struct {
@@ -44,6 +45,21 @@ func (c *BotConfig) sendCommandMessage() {
 	msg := c.messageConfig
 	msg.ChatID = c.chatID
 	msg.ReplyToMessageID = c.update.Message.MessageID
+	if msg.Text == "" {
+		msg.Text = "无言以对"
+	}
+	req, err := c.bot.Send(msg)
+	if err != nil {
+		logrus.Error(err)
+	} else {
+		c.botMessageID = req.MessageID
+	}
+	logrus.Debugf("send_msg:%v", util.LogMarshal(msg))
+}
+
+func (c *BotConfig) sendMessage() {
+	msg := c.messageConfig
+	msg.ChatID = c.chatID
 	if msg.Text == "" {
 		msg.Text = "无言以对"
 	}
@@ -347,11 +363,23 @@ func (c *BotConfig) IsMarsWhitelist(username string) bool {
 }
 
 func (c *BotConfig) IsMarsOCRWhitelist(username string) bool {
-	if !config.Conf.EnableMarsWhitelist {
+	if !config.Conf.MarsOCR.EnableWhitelist {
 		return true
 	}
 	marsOCRWhitelistKey := util.StrBuilder(marsOCRWhitelistDir, util.NumToStr(c.bot.Self.ID))
 	isMember, err := db.RDB.SIsMember(c.ctx, marsOCRWhitelistKey, username).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	return isMember
+}
+
+func (c *BotConfig) IsChatGuardWhitelist(username string) bool {
+	if !config.Conf.ChatGuard.EnableWhitelist {
+		return true
+	}
+	chatGuardWhitelistKey := util.StrBuilder(chatGuardWhitelistDir, util.NumToStr(c.bot.Self.ID))
+	isMember, err := db.RDB.SIsMember(c.ctx, chatGuardWhitelistKey, username).Result()
 	if err != nil {
 		logrus.Error(err)
 	}
@@ -374,4 +402,8 @@ func (c *BotConfig) IsCommand() bool {
 		}
 	}
 	return true
+}
+
+func (c *BotConfig) GetUpdate() tgbotapi.Update {
+	return c.update
 }

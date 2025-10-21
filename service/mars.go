@@ -11,9 +11,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 type mars struct {
@@ -79,7 +80,7 @@ func (c *MarsConfig) handleMars() {
 		Length: 2,
 	},
 	}
-	delMarsCallbackData := generateCallbackData("delete-mars-msg", c.update.Message.From.ID, c.update.Message.MessageID)
+	delMarsCallbackData := generateCallbackData("delete-chat-msg-clean", c.update.Message.From.ID, c.update.Message.MessageID)
 	getMarsCallbackData := generateCallbackData("get-user-mars", c.update.Message.From.ID, c.update.Message.MessageID)
 	delMarsConfirmButton := tgbotapi.NewInlineKeyboardButtonData("悄悄删掉", delMarsCallbackData)
 	getMarsConfirmButton := tgbotapi.NewInlineKeyboardButtonData("无动于衷", getMarsCallbackData)

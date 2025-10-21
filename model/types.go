@@ -1,9 +1,10 @@
 package model
 
 import (
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"sync"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 const (
@@ -52,4 +53,9 @@ type UpdateConfig struct {
 	ChatID     int64
 	UpdateType string
 	ChatType   string
+}
+
+type ChatGuardMessage struct {
+	SafeLabel  string   `json:"safe_label"`
+	Categories []string `json:"categories"`
 }

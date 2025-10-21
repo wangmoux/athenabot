@@ -3,15 +3,21 @@ package service
 import (
 	"athenabot/config"
 	"athenabot/db"
+	"athenabot/model"
 	"athenabot/util"
 	"context"
-	"github.com/go-redis/redis/v8"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sirupsen/logrus"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/go-redis/redis/v8"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sirupsen/logrus"
 )
 
 type ChatConfig struct {
@@ -212,4 +218,93 @@ func (c *ChatConfig) ChatUserActivity() {
 	if err != nil {
 		logrus.Error(err)
 	}
+}
+
+var chatGuardLimit = make(chan struct{}, 2)
+
+func (c *ChatConfig) ChatGuardHandler() {
+	chatGuardLimit <- struct{}{}
+	go c.chatGuardHandler(chatGuardLimit)
+}
+
+func (c *ChatConfig) chatGuardHandler(chatGuardLimit chan struct{}) {
+	defer func() { <-chatGuardLimit }()
+	if c.update.Message.From.IsBot || c.update.Message.IsCommand() {
+		return
+	}
+	if len(c.update.Message.Text) < 6 || len(c.update.Message.Text) > 256 {
+		return
+	}
+	client := http.Client{}
+	payload := strings.NewReader(`{"prompt": "` + c.update.Message.Text + `"}`)
+	req, err := http.NewRequest("POST", config.Conf.ChatGuard.GuardServerURL, payload)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	logrus.Infof("guard:%s by %s", string(body), c.update.Message.Text)
+	guardMessage := model.ChatGuardMessage{}
+	_ = json.Unmarshal(body, &guardMessage)
+	if guardMessage.SafeLabel == "" || guardMessage.SafeLabel == "Safe" {
+		return
+	}
+	if config.Conf.ChatGuard.SafeLabel == "Unsafe" && guardMessage.SafeLabel == "Controversial" {
+		return
+	}
+	if len(guardMessage.Categories) == 0 {
+		return
+	}
+	if _, ok := config.CategoriesFilter[guardMessage.Categories[0]]; !ok {
+		return
+	}
+
+	var categories string
+	for i := range guardMessage.Categories {
+		if i == len(guardMessage.Categories)-1 {
+			categories += guardMessage.Categories[i]
+			break
+		}
+		categories += guardMessage.Categories[i] + ", "
+	}
+	fullName := c.update.Message.From.FirstName + c.update.Message.From.LastName
+	reasonConfirmButton := tgbotapi.NewInlineKeyboardButtonData("删除", generateCallbackData("delete-chat-msg-clean", c.update.Message.From.ID, c.update.Message.MessageID))
+	restrictConfirmButton := tgbotapi.NewInlineKeyboardButtonData("禁言", generateCallbackData("restrict-user", c.update.Message.From.ID, fmt.Sprintf("%s", fullName)))
+	// banConfirmButton := tgbotapi.NewInlineKeyboardButtonData("封禁", generateCallbackData("ban-user", c.update.Message.From.ID, fmt.Sprintf("%s", fullName)))
+
+	replyMarkup := tgbotapi.NewInlineKeyboardMarkup(
+		[]tgbotapi.InlineKeyboardButton{reasonConfirmButton, restrictConfirmButton /*banConfirmButton*/},
+	)
+	c.messageConfig.ReplyMarkup = replyMarkup
+	prefix := "聊天卫士检测到敏感话题"
+	c.messageConfig.Text = fmt.Sprintf("%s %s\n%s  “%s”", prefix, categories, fullName, c.update.Message.Text)
+	humanChatID := c.chatID - c.chatID - c.chatID - 1000000000000
+	LatestMarsMessage := util.StrBuilder("https://t.me/c/", util.NumToStr(humanChatID), "/", util.NumToStr(c.update.Message.MessageID))
+	fullNameOffset := util.TGNameWidth(fmt.Sprintf("%s %s\n", prefix, categories))
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{
+		{
+			Type:   "text_mention",
+			Offset: fullNameOffset,
+			Length: util.TGNameWidth(fullName),
+			User:   &tgbotapi.User{ID: c.update.Message.From.ID},
+		},
+		{
+			Type:   "text_link",
+			URL:    LatestMarsMessage,
+			Offset: fullNameOffset + util.TGNameWidth(fullName) + 2,
+			Length: util.TGNameWidth(c.update.Message.Text) + 2,
+		}}
+	c.update.Message.MessageID = -1
+	c.sendCommandMessage()
 }

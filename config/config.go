@@ -3,11 +3,12 @@ package config
 import (
 	"athenabot/util"
 	"encoding/json"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Modules struct {
@@ -35,6 +36,14 @@ type MarsOCR struct {
 	MinHitRatio     float32 `json:"min_hit_ratio"`
 }
 
+type ChatGuard struct {
+	EnableGuard      bool     `json:"enable_guard"`
+	EnableWhitelist  bool     `json:"enable_whitelist"`
+	GuardServerURL   string   `json:"guard_server_url"`
+	CategoriesFilter []string `json:"categories_filter"`
+	SafeLabel        string   `json:"safe_label"`
+}
+
 type InlineQueryResultArticle struct {
 	Title       string `json:"title"`
 	MessageText string `json:"message_text"`
@@ -56,12 +65,14 @@ type Config struct {
 	SudoAdmins                []int64                    `json:"sudo_admins"`
 	OwnerID                   int64                      `json:"owner_id"`
 	InlineQueryResultArticles []InlineQueryResultArticle `json:"inline_query_result_articles"`
+	ChatGuard                 ChatGuard                  `json:"chat_guard"`
 }
 
 var (
 	Conf                      Config
 	DisablePrivateCommandsMap = make(map[string]uint8)
 	DisableCommandsMap        = make(map[string]uint8)
+	CategoriesFilter          = make(map[string]struct{})
 )
 
 func init() {
@@ -86,6 +97,9 @@ func init() {
 	}
 	for _, i := range Conf.DisablePrivateCommands {
 		DisablePrivateCommandsMap[i] = 0
+	}
+	for _, i := range Conf.ChatGuard.CategoriesFilter {
+		CategoriesFilter[i] = struct{}{}
 	}
 
 	switch {

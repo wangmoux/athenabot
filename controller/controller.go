@@ -6,9 +6,10 @@ import (
 	"athenabot/service"
 	"athenabot/util"
 	"context"
+	"sync"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfig) {
@@ -36,10 +37,16 @@ func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfi
 			cb.ClearMy48hMessage()
 		case "clear-users":
 			cb.ClearInactivityUsers()
-		case "delete-mars-msg":
-			cb.DeleteMarsMessage()
+		case "delete-chat-msg-clean":
+			cb.DeleteMessage(true)
 		case "get-user-mars":
 			cb.GetUserMars()
+		case "delete-chat-msg":
+			cb.DeleteMessage(false)
+		case "restrict-user":
+			cb.RestrictUser()
+		case "ban-user":
+			cb.BanUser()
 		}
 	case model.MessageType:
 		switch uc.ChatType {
@@ -120,6 +127,9 @@ func asyncController(ctx context.Context, ch asyncChannel, chatID int64) {
 			}
 			if c.IsEnableChatService("chat_user_activity") {
 				cc.ChatUserActivity()
+			}
+			if config.Conf.ChatGuard.EnableGuard && c.IsChatGuardWhitelist(c.GetUpdate().Message.Chat.UserName) && c.IsEnableChatService("chat_guard") {
+				cc.ChatGuardHandler()
 			}
 		case <-ctx.Done():
 			asyncMap.Delete(chatID)

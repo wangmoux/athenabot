@@ -25,6 +25,7 @@ const (
 	groupWhitelistDir              = "bot:group_whitelist:"
 	marsWhitelistDir               = "bot:mars_whitelist:"
 	marsOCRWhitelistDir            = "bot:mars_ocr_whitelist:"
+	chatGuardWhitelistDir          = "bot:chat_guard_whitelist:"
 )
 
 const (

@@ -4,10 +4,11 @@ import (
 	"athenabot/db"
 	"athenabot/util"
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sirupsen/logrus"
 )
 
 type CallBack struct {
@@ -107,7 +108,7 @@ func (c *CallBack) ClearInactivityUsers() {
 	}
 }
 
-func (c *CallBack) DeleteMarsMessage() {
+func (c *CallBack) DeleteMessage(isClean bool) {
 	if c.callbackData.UserID != c.update.CallbackQuery.From.ID {
 		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
 		c.sendRequestMessage(msg)
@@ -122,6 +123,9 @@ func (c *CallBack) DeleteMarsMessage() {
 			ChatID:    c.chatID,
 			MessageID: marsMessageID,
 		})
+		if !isClean {
+			return
+		}
 		_, _ = c.bot.Request(tgbotapi.DeleteMessageConfig{
 			ChatID:    c.chatID,
 			MessageID: c.update.CallbackQuery.Message.MessageID,
@@ -152,4 +156,71 @@ func (c *CallBack) GetUserMars() {
 		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, fmt.Sprintf("你已经火星%d次了", int(userMars)))
 		c.sendRequestMessage(msg)
 	}
+}
+
+func (c *CallBack) RestrictUser() {
+	if !c.isAdminCanRestrictMembers(c.update.CallbackQuery.From.ID) {
+		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
+		c.sendRequestMessage(msg)
+		return
+	}
+	nowTimestamp := time.Now().Unix()
+	req, err := c.bot.Request(tgbotapi.RestrictChatMemberConfig{
+		ChatMemberConfig: tgbotapi.ChatMemberConfig{
+			ChatID: c.chatID,
+			UserID: c.callbackData.UserID,
+		},
+		UntilDate: 365*24*60*60 + nowTimestamp,
+	})
+	if !req.Ok {
+		logrus.Errorln(req.ErrorCode, err)
+		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "限制失败")
+		c.sendRequestMessage(msg)
+		return
+	}
+	msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "限制成功")
+	c.sendRequestMessage(msg)
+	fullName := c.callbackData.Data.(string)
+	c.messageConfig.Text = fmt.Sprintf("%s已被管理员限制发言", fullName)
+	c.messageConfig.ReplyToMessageID = c.update.CallbackQuery.Message.MessageID
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(fullName),
+		User:   &tgbotapi.User{ID: c.callbackData.UserID},
+	}}
+	c.sendMessage()
+}
+
+func (c *CallBack) BanUser() {
+	if !c.isAdminCanRestrictMembers(c.update.CallbackQuery.From.ID) {
+		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "你是？")
+		c.sendRequestMessage(msg)
+		return
+	}
+	req, err := c.bot.Request(tgbotapi.BanChatMemberConfig{
+		ChatMemberConfig: tgbotapi.ChatMemberConfig{
+			ChatID: c.chatID,
+			UserID: c.callbackData.UserID,
+		},
+	})
+	if !req.Ok {
+		logrus.Errorln(req.ErrorCode, err)
+		msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "封禁失败")
+		c.sendRequestMessage(msg)
+		return
+	}
+	msg := tgbotapi.NewCallback(c.update.CallbackQuery.ID, "封禁成功")
+	c.sendRequestMessage(msg)
+	fmt.Println(c.callbackData.Data)
+	fullName := c.callbackData.Data.(string)
+	c.messageConfig.Text = fmt.Sprintf("%s已被管理员封禁", fullName)
+	c.messageConfig.ReplyToMessageID = c.update.CallbackQuery.Message.MessageID
+	c.messageConfig.Entities = []tgbotapi.MessageEntity{{
+		Type:   "text_mention",
+		Offset: 0,
+		Length: util.TGNameWidth(fullName),
+		User:   &tgbotapi.User{ID: c.callbackData.UserID},
+	}}
+	c.sendMessage()
 }

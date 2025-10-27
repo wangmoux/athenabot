@@ -5,13 +5,16 @@ import (
 	"athenabot/db"
 	"athenabot/model"
 	"athenabot/util"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -45,7 +48,7 @@ func (c *ChatConfig) ChatLimit() {
 			if group.count >= 10 {
 				if timestamp-group.timestamp < 30 {
 					c.messageConfig.Text = "多吃饭少说话"
-					c.sendCommandMessage()
+					c.sendReplyMessage()
 					logrus.Infof("chat_limit:%+v", group)
 				}
 				group.timestamp = timestamp
@@ -143,7 +146,7 @@ func (c *ChatConfig) chatUserprofileWatchHandler(key, currentName, prefix string
 				Length: util.TGNameWidth(prefix),
 				User:   &tgbotapi.User{ID: userID},
 			}}
-			c.sendCommandMessage()
+			c.sendReplyMessage()
 			err = db.RDB.ZAdd(c.ctx, key, &redis.Z{
 				Score:  float64(time.Now().Unix()),
 				Member: currentName,
@@ -202,7 +205,7 @@ func (c *ChatConfig) ChatBlacklistHandler() {
 	for _, keyword := range keywords {
 		if strings.Contains(text, keyword) {
 			c.messageConfig.Text = "你的发言涉嫌违反群规"
-			c.sendCommandMessage()
+			c.sendReplyMessage()
 			break
 		}
 	}
@@ -229,15 +232,20 @@ func (c *ChatConfig) ChatGuardHandler() {
 
 func (c *ChatConfig) chatGuardHandler(chatGuardLimit chan struct{}) {
 	defer func() { <-chatGuardLimit }()
-	if c.update.Message.From.IsBot || c.update.Message.IsCommand() {
+	if c.update.Message.IsCommand() {
 		return
 	}
-	if len(c.update.Message.Text) < 6 || len(c.update.Message.Text) > 256 {
+	if c.update.Message.From.ID == c.bot.Self.ID {
 		return
 	}
-	client := http.Client{}
-	payload := strings.NewReader(`{"prompt": "` + c.update.Message.Text + `"}`)
-	req, err := http.NewRequest("POST", config.Conf.ChatGuard.GuardServerURL, payload)
+	if len(c.update.Message.Text) < 1 || len(c.update.Message.Text) > 1024 {
+		return
+	}
+	client := &http.Client{
+		Timeout: time.Second * 60,
+	}
+	payload, _ := json.Marshal(model.ChatGuardRequest{Prompt: c.update.Message.Text})
+	req, err := http.NewRequest("POST", config.Conf.ChatGuard.GuardServerURL, bytes.NewReader(payload))
 	if err != nil {
 		logrus.Error(err)
 		return
@@ -248,14 +256,20 @@ func (c *ChatConfig) chatGuardHandler(chatGuardLimit chan struct{}) {
 		logrus.Error(err)
 		return
 	}
-	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		logrus.Error(resp.StatusCode)
+		return
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logrus.Error(err)
 		return
 	}
-	logrus.Infof("guard:%s by %s", string(body), c.update.Message.Text)
-	guardMessage := model.ChatGuardMessage{}
+	logrus.Infof("guard: %s by %s", body, c.update.Message.Text)
+	guardMessage := model.ChatGuardResponse{}
 	_ = json.Unmarshal(body, &guardMessage)
 	if guardMessage.SafeLabel == "" || guardMessage.SafeLabel == "Safe" {
 		return
@@ -305,6 +319,200 @@ func (c *ChatConfig) chatGuardHandler(chatGuardLimit chan struct{}) {
 			Offset: fullNameOffset + util.TGNameWidth(fullName) + 2,
 			Length: util.TGNameWidth(c.update.Message.Text) + 2,
 		}}
-	c.update.Message.MessageID = -1
-	c.sendCommandMessage()
+	c.sendMessage()
+}
+
+var chatBotLimit = make(chan struct{}, 2)
+
+var chatBotActiveLatestTime sync.Map
+var chatBotPseudoRandom sync.Map
+var chatBotGroupSessions sync.Map
+
+func (c *ChatConfig) ChatBotHandler() {
+	chatBotLimit <- struct{}{}
+	go c.chatBotHandler(chatBotLimit)
+}
+
+func (c *ChatConfig) chatBotHandler(chatBotLimit chan struct{}) {
+	defer func() { <-chatBotLimit }()
+	if c.update.Message.IsCommand() {
+		return
+	}
+	if c.update.Message.From.ID == c.bot.Self.ID {
+		return
+	}
+	chatBotActiveLatestTime.Store(c.chatID, time.Now().Unix())
+	if len(c.update.Message.Text) < 1 || len(c.update.Message.Text) > 1024 {
+		return
+	}
+	content := &model.ChatbotContent{
+		Nickname: c.update.Message.From.FirstName,
+		Content:  c.update.Message.Text,
+	}
+	var isReplyToMessage bool
+	if c.update.Message.ReplyToMessage != nil {
+		if len(c.update.Message.ReplyToMessage.Text) > 0 && len(c.update.Message.ReplyToMessage.Text) < 1025 {
+			isReplyToMessage = true
+		}
+	}
+	if isReplyToMessage {
+		content.ReplyToMessage = &model.ChatbotContent{
+			Nickname: c.update.Message.ReplyToMessage.From.FirstName,
+			Content:  c.update.Message.ReplyToMessage.Text,
+		}
+	}
+	contents := c.addChatBotGroupSessions(content)
+	for _, entity := range c.update.Message.Entities {
+		if entity.Type == "mention" {
+			if strings.Contains(c.update.Message.Text, fmt.Sprintf("@%s", c.bot.Self.UserName)) {
+				c.chatBotMentionHandler()
+			}
+		}
+	}
+	if isReplyToMessage && config.Conf.ChatBot.EnableReply && c.update.Message.ReplyToMessage.From.ID == c.bot.Self.ID {
+		c.chatBotReplyHandler()
+		return
+	}
+	chatRandom := config.Conf.ChatBot.ChatRandom
+	_pseudoRandom, ok := chatBotPseudoRandom.Load(c.chatID)
+	if !ok {
+		_pseudoRandom = 0
+		chatBotPseudoRandom.Store(c.chatID, 0)
+	}
+	pseudoRandom := _pseudoRandom.(int)
+	pseudoRandom += 1
+	if pseudoRandom >= config.Conf.ChatBot.ChatRandom {
+	} else {
+		chatBotPseudoRandom.Store(c.chatID, pseudoRandom)
+		if rand.Intn(chatRandom) != 0 {
+			return
+		}
+	}
+	defer func() {
+		chatBotPseudoRandom.Store(c.chatID, 0)
+	}()
+	logrus.Infof("chat_bot request for %s", c.update.Message.Text)
+	c.chat(&model.ChatbotRequest{
+		Contents: contents,
+		ChatType: "group_chat",
+	})
+}
+
+func (c *ChatConfig) chatBotReplyHandler() {
+	var contents []*model.ChatbotContent
+	contents = append(contents, &model.ChatbotContent{
+		IsModel:  true,
+		Nickname: c.update.Message.ReplyToMessage.From.FirstName,
+		Content:  c.update.Message.ReplyToMessage.Text,
+	})
+	contents = append(contents, &model.ChatbotContent{
+		Nickname: c.update.Message.From.FirstName,
+		Content:  c.update.Message.Text,
+	})
+	logrus.Infof("chat_bot_reply request for %s", c.update.Message.Text)
+	c.chat(&model.ChatbotRequest{
+		Contents: contents,
+		ChatType: "group_reply",
+	})
+}
+
+func (c *ChatConfig) chatBotMentionHandler() {
+	var contents []*model.ChatbotContent
+	content := strings.Replace(c.update.Message.Text, fmt.Sprintf("@%s", c.bot.Self.UserName), "", -1)
+	contents = append(contents, &model.ChatbotContent{
+		Nickname: c.update.Message.From.FirstName,
+		Content:  content,
+	})
+	logrus.Infof("chat_bot_mention request for %s", content)
+	c.chat(&model.ChatbotRequest{
+		Contents: contents,
+		ChatType: "group_reply",
+	})
+}
+
+func (c *ChatConfig) ChatBotActiveHandler() {
+	logrus.Infof("new chat_bot_active_handler: %v", c.chatID)
+	ticker := time.NewTicker(time.Second * 5)
+	for range ticker.C {
+		_latestTime, ok := chatBotActiveLatestTime.Load(c.chatID)
+		if !ok {
+			continue
+		}
+		latestTime := _latestTime.(int64)
+		if time.Now().Unix()-latestTime < int64(config.Conf.ChatBot.ActiveTiming) {
+			continue
+		}
+		chatBotActiveLatestTime.Delete(c.chatID)
+		func() {
+			contents := "说点什么"
+			logrus.Infof("chat_bot_active request for %s", contents)
+			c.chat(&model.ChatbotRequest{
+				Contents: []*model.ChatbotContent{
+					{
+						Content: contents,
+					},
+				},
+				ChatType: "group_active",
+			})
+		}()
+	}
+}
+
+func (c *ChatConfig) addChatBotGroupSessions(content *model.ChatbotContent) []*model.ChatbotContent {
+	contents := c.getChatBotGroupSessions()
+	contents = append(contents, content)
+	chatBotGroupSessionsLen := len(contents)
+	if chatBotGroupSessionsLen > 10 {
+		contents = contents[chatBotGroupSessionsLen-10:]
+	}
+	chatBotGroupSessions.Store(c.chatID, contents)
+	return contents
+}
+
+func (c *ChatConfig) getChatBotGroupSessions() []*model.ChatbotContent {
+	_contents, ok := chatBotGroupSessions.Load(c.chatID)
+	if !ok {
+		_contents = []*model.ChatbotContent{}
+	}
+	return _contents.([]*model.ChatbotContent)
+}
+
+func (c *ChatConfig) chat(cr *model.ChatbotRequest) {
+	client := &http.Client{
+		Timeout: time.Second * 60,
+	}
+	payload, _ := json.Marshal(cr)
+	req, err := http.NewRequest("POST", config.Conf.ChatBot.ChatBotServerURL, bytes.NewReader(payload))
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	if resp.StatusCode != 200 {
+		logrus.Error(resp.StatusCode)
+		return
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	logrus.Infof("chat_bot response: %s by %s", body, cr.ChatType)
+	chatbotMessage := model.ChatbotResponse{}
+	_ = json.Unmarshal(body, &chatbotMessage)
+	c.messageConfig.Text = chatbotMessage.BotMessage
+	c.sendMessage()
+	c.addChatBotGroupSessions(&model.ChatbotContent{
+		IsModel:  true,
+		Nickname: c.bot.Self.FirstName,
+		Content:  chatbotMessage.BotMessage,
+	})
 }

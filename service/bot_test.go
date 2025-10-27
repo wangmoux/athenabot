@@ -16,7 +16,7 @@ func TestBotConfig_SendMessage(t *testing.T) {
 	//	bot: nil,
 	//}
 	//c.bot, _ = tgbotapi.NewBotAPI(config.Conf.BotToken)
-	//c.messageConfig.Text = "测试消息"
+	//c.messageConfig.Content = "测试消息"
 	//c.messageConfig.ChatID = c.chatID
-	//c.sendCommandMessage()
+	//c.sendReplyMessage()
 }

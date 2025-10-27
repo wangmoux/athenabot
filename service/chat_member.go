@@ -3,9 +3,10 @@ package service
 import (
 	"athenabot/db"
 	"athenabot/util"
+	"time"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 func (c *ChatConfig) NewChatMemberVerify() {
@@ -34,7 +35,7 @@ func (c *ChatConfig) NewChatMemberVerify() {
 				},
 			}
 			c.messageConfig.Text = util.StrBuilder("欢迎 ", c.update.Message.From.FirstName, " 【点我】 完成验证就可以说话了")
-			c.sendCommandMessage()
+			c.sendReplyMessage()
 			chatVerifyKey := util.StrBuilder(chatVerifyKeyDir, util.NumToStr(c.chatID), ":", util.NumToStr(c.update.Message.From.ID))
 			err := db.RDB.Set(c.ctx, chatVerifyKey, c.update.Message.Chat.UserName, time.Second*3600).Err()
 			if err != nil {
@@ -85,7 +86,7 @@ func (c *ChatConfig) chatMemberVerify(chatID int64) {
 				},
 			}
 			c.messageConfig.Text = "你可以说话了【点我】进群"
-			c.sendCommandMessage()
+			c.sendReplyMessage()
 			err := db.RDB.Del(c.ctx, chatVerifyKey).Err()
 			if err != nil {
 				logrus.Error(err)

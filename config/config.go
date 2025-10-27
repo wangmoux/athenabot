@@ -15,6 +15,7 @@ type Modules struct {
 	EnableMars           bool `json:"enable_mars"`
 	EnableCommand        bool `json:"enable_command"`
 	EnablePrivateCommand bool `json:"enable_private_command"`
+	EnablePrivateChat    bool `json:"enable_private_chat"`
 }
 
 type Webhook struct {
@@ -44,6 +45,15 @@ type ChatGuard struct {
 	SafeLabel        string   `json:"safe_label"`
 }
 
+type ChatBot struct {
+	EnableChatbot    bool   `json:"enable_chat_bot"`
+	EnableWhitelist  bool   `json:"enable_whitelist"`
+	EnableReply      bool   `json:"enable_reply"`
+	ChatBotServerURL string `json:"chat_bot_server_url"`
+	ChatRandom       int    `json:"chat_random"`
+	ActiveTiming     int    `json:"active_timing"`
+}
+
 type InlineQueryResultArticle struct {
 	Title       string `json:"title"`
 	MessageText string `json:"message_text"`
@@ -66,6 +76,7 @@ type Config struct {
 	OwnerID                   int64                      `json:"owner_id"`
 	InlineQueryResultArticles []InlineQueryResultArticle `json:"inline_query_result_articles"`
 	ChatGuard                 ChatGuard                  `json:"chat_guard"`
+	ChatBot                   ChatBot                    `json:"chat_bot"`
 }
 
 var (
@@ -113,6 +124,11 @@ func init() {
 	default:
 		logrus.SetLevel(logrus.ErrorLevel)
 	}
-
+	if Conf.ChatBot.ChatRandom == 0 {
+		Conf.ChatBot.ChatRandom = 10
+	}
+	if Conf.ChatBot.ActiveTiming == 0 {
+		Conf.ChatBot.ActiveTiming = 3600
+	}
 	logrus.Infof("config:%v", util.LogMarshal(Conf))
 }

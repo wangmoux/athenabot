@@ -88,7 +88,7 @@ func (c *MarsConfig) handleMars() {
 		[]tgbotapi.InlineKeyboardButton{delMarsConfirmButton, getMarsConfirmButton},
 	)
 	c.messageConfig.ReplyMarkup = replyMarkup
-	c.sendCommandMessage()
+	c.sendReplyMessage()
 	logrus.Infof("mars_user:%v mars_id:%v", c.update.Message.From.ID, c.marsID)
 	t := newTopConfig(c.BotConfig)
 	t.setTop(marsTopKeyDir, c.update.Message.From.ID, 1)

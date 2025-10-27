@@ -24,15 +24,17 @@ type BotConfig struct {
 	botMessageCleanCountdown int
 	botMessageID             int
 	chatID                   int64
+	sendMessageLimit         chan struct{}
 }
 
 func NewBotConfig(ctx context.Context, bot *tgbotapi.BotAPI, update tgbotapi.Update) *BotConfig {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	botConfig := &BotConfig{
-		ctx:    ctx,
-		cancel: cancel,
-		update: update,
-		bot:    bot,
+		ctx:              ctx,
+		cancel:           cancel,
+		update:           update,
+		bot:              bot,
+		sendMessageLimit: make(chan struct{}, 1),
 	}
 	return botConfig
 }
@@ -41,26 +43,25 @@ func (c *BotConfig) SetChatID(chatID int64) {
 	c.chatID = chatID
 }
 
-func (c *BotConfig) sendCommandMessage() {
-	msg := c.messageConfig
-	msg.ChatID = c.chatID
-	msg.ReplyToMessageID = c.update.Message.MessageID
-	if msg.Text == "" {
-		msg.Text = "无言以对"
-	}
-	req, err := c.bot.Send(msg)
-	if err != nil {
-		logrus.Error(err)
-	} else {
-		c.botMessageID = req.MessageID
-	}
-	logrus.Debugf("send_msg:%v", util.LogMarshal(msg))
+func (c *BotConfig) sendReplyMessage() {
+	c.setReplyMessage(c.update.Message.MessageID)
+	c.sendMessage()
+}
+
+func (c *BotConfig) setReplyMessage(replyMessageID int) {
+	c.messageConfig.ReplyToMessageID = replyMessageID
 }
 
 func (c *BotConfig) sendMessage() {
+	c.sendMessageLimit <- struct{}{}
+	defer func() {
+		c.messageConfig = tgbotapi.MessageConfig{}
+		<-c.sendMessageLimit
+	}()
 	msg := c.messageConfig
 	msg.ChatID = c.chatID
 	if msg.Text == "" {
+		logrus.Warnln("send empty message")
 		msg.Text = "无言以对"
 	}
 	req, err := c.bot.Send(msg)
@@ -380,6 +381,18 @@ func (c *BotConfig) IsChatGuardWhitelist(username string) bool {
 	}
 	chatGuardWhitelistKey := util.StrBuilder(chatGuardWhitelistDir, util.NumToStr(c.bot.Self.ID))
 	isMember, err := db.RDB.SIsMember(c.ctx, chatGuardWhitelistKey, username).Result()
+	if err != nil {
+		logrus.Error(err)
+	}
+	return isMember
+}
+
+func (c *BotConfig) IsChatbotWhitelist(username string) bool {
+	if !config.Conf.ChatBot.EnableWhitelist {
+		return true
+	}
+	chatbotWhitelistKey := util.StrBuilder(chatBotWhitelistDir, util.NumToStr(c.bot.Self.ID))
+	isMember, err := db.RDB.SIsMember(c.ctx, chatbotWhitelistKey, username).Result()
 	if err != nil {
 		logrus.Error(err)
 	}

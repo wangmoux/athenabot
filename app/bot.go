@@ -5,10 +5,11 @@ import (
 	"athenabot/controller"
 	"athenabot/model"
 	"context"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sirupsen/logrus"
 )
 
 func RunBot() {
@@ -31,6 +32,7 @@ func RunBot() {
 
 func updatesHandler(client Client) {
 	for update := range client.Channel() {
+		go debugMessage(&update)
 		uc := &model.UpdateConfig{
 			Update: update,
 		}

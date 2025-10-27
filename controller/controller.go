@@ -55,6 +55,10 @@ func Controller(ctx context.Context, bot *tgbotapi.BotAPI, uc *model.UpdateConfi
 				service.NewCommandConfig(c).InPrivateCommands()
 				return
 			}
+			if config.Conf.Modules.EnablePrivateChat {
+				service.NewChatPrivateConfig(c).ChatBotHandler()
+				return
+			}
 		default:
 			if c.IsGroupWhitelist(update.Message.Chat.UserName) {
 				func() {
@@ -109,6 +113,9 @@ func asyncController(ctx context.Context, ch asyncChannel, chatID int64) {
 				if c.IsEnableChatService("clear_my_48h_message") {
 					go cc.Delete48hMessageCronHandler(ctx)
 				}
+				if config.Conf.ChatBot.EnableChatbot && c.IsChatbotWhitelist(c.GetUpdate().Message.Chat.UserName) && c.IsEnableChatService("chat_bot") {
+					go cc.ChatBotActiveHandler()
+				}
 			})
 			if c.IsEnableChatService("chat_member_verify") {
 				cc.NewChatMemberVerify()
@@ -130,6 +137,9 @@ func asyncController(ctx context.Context, ch asyncChannel, chatID int64) {
 			}
 			if config.Conf.ChatGuard.EnableGuard && c.IsChatGuardWhitelist(c.GetUpdate().Message.Chat.UserName) && c.IsEnableChatService("chat_guard") {
 				cc.ChatGuardHandler()
+			}
+			if config.Conf.ChatBot.EnableChatbot && c.IsChatbotWhitelist(c.GetUpdate().Message.Chat.UserName) && c.IsEnableChatService("chat_bot") {
+				cc.ChatBotHandler()
 			}
 		case <-ctx.Done():
 			asyncMap.Delete(chatID)

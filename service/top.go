@@ -71,5 +71,5 @@ func (c *topConfig) getTop(topKey string, topPrefix, topSuffix string) {
 		topText += util.StrBuilder(chatMember.User.FirstName, " ", topPrefix, util.NumToStr(score), topSuffix, "\n")
 	}
 	c.messageConfig.Text = topText
-	c.sendCommandMessage()
+	c.sendReplyMessage()
 }

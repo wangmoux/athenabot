@@ -55,7 +55,28 @@ type UpdateConfig struct {
 	ChatType   string
 }
 
-type ChatGuardMessage struct {
+type ChatGuardResponse struct {
 	SafeLabel  string   `json:"safe_label"`
 	Categories []string `json:"categories"`
+}
+
+type ChatGuardRequest struct {
+	Prompt string `json:"prompt"`
+}
+
+type ChatbotResponse struct {
+	BotMessage string `json:"bot_message"`
+}
+
+type ChatbotContent struct {
+	IsModel        bool            `json:"is_model,omitempty"`
+	Nickname       string          `json:"nickname"`
+	Content        string          `json:"content"`
+	ReplyToMessage *ChatbotContent `json:"reply_to_message,omitempty"`
+}
+
+type ChatbotRequest struct {
+	Contents []*ChatbotContent `json:"contents"`
+	ChatType string            `json:"chat_type"`
+	Model    string            `json:"model,omitempty"`
 }

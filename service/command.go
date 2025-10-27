@@ -4,9 +4,10 @@ import (
 	"athenabot/config"
 	"athenabot/db"
 	"athenabot/util"
-	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type CommandConfig struct {
@@ -144,40 +145,40 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 	// c.mustReply = true 必须处理指定消息
 	if c.mustReply && c.update.Message.ReplyToMessage == nil {
 		c.messageConfig.Text = "搞空气！"
-		c.sendCommandMessage()
+		c.sendReplyMessage()
 		return false
 	}
 	// c.mustAdmin = true 管理员才能使用的命令
 	if c.mustAdmin && !c.userIsAdmin {
 		c.messageConfig.Text = "你不行！"
-		c.sendCommandMessage()
+		c.sendReplyMessage()
 		return false
 	}
 	// c.mustAdminCanRestrictMembers = true 有封禁权限的管理员才能使用的命令
 	if c.mustAdminCanRestrictMembers && !c.userIsRestrictAdmin {
 		c.messageConfig.Text = "你不中！"
-		c.sendCommandMessage()
+		c.sendReplyMessage()
 		return false
 	}
 	if c.update.Message.ReplyToMessage != nil {
 		// 不能处理管理员的消息
 		if c.replyUserIsAdmin && !c.canHandleAdminReply {
 			c.messageConfig.Text = "你太弱！"
-			c.sendCommandMessage()
+			c.sendReplyMessage()
 			return false
 		}
 		// c.canHandleSelf = true 允许处理自己的消息
 		if c.canHandleSelf && c.update.Message.From.ID == c.update.Message.ReplyToMessage.From.ID {
 			if c.userIsAdmin && !c.canHandleNoAdminReply {
 				c.messageConfig.Text = "搞不了！"
-				c.sendCommandMessage()
+				c.sendReplyMessage()
 				return false
 			}
 		} else {
 			// 处理的不是自己的消息则必须是管理员 (c.canHandleNoAdminReply = true 除外)
 			if !c.userIsAdmin && !c.canHandleNoAdminReply {
 				c.messageConfig.Text = "搞不成！"
-				c.sendCommandMessage()
+				c.sendReplyMessage()
 				return false
 			}
 		}
@@ -187,7 +188,7 @@ func (c *CommandConfig) isApproveCommandRule() bool {
 		// c.canHandleAdmin = true 允许管理员发送单独指令
 		if !c.canHandleAdmin && c.userIsAdmin {
 			c.messageConfig.Text = "不受理！"
-			c.sendCommandMessage()
+			c.sendReplyMessage()
 			return false
 		}
 		c.handleUserName = c.update.Message.From.FirstName
